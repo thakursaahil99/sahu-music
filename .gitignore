@@ -19,3 +19,6 @@ next-env.d.ts
 
 # Built APK copied in by "npm run apk" (large binary; host it or rebuild instead of committing)
 apps/web/public/downloads/*.apk
+
+.vercel
+.env*

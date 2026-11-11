@@ -1,0 +1,14 @@
+node_modules
+.next
+.next-dev
+out
+dist
+.env
+.env.local
+.env.*.local
+*.log
+apps/mobile
+apps/web/public/downloads/*.apk
+supabase/.temp
+supabase/.branches
+coverage
