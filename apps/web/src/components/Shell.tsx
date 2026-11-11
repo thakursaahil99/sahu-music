@@ -9,7 +9,7 @@ import { useOnline } from '@/lib/hooks';
 import { music } from '@/lib/music';
 import { usePlayer } from '@/lib/player';
 import { Icon, type IconName } from './icons';
-import { BuiltByBadge, Logo } from './Logo';
+import { Logo } from './Logo';
 import { FullPlayer, MiniPlayer } from './players';
 import { usePwaInstall } from './Pwa';
 import { VideoStage } from './VideoStage';
@@ -151,8 +151,8 @@ export function Shell({ children }: { children: ReactNode }) {
         <main id="main" ref={mainRef} className="main-panel min-w-0 flex-1 overflow-y-auto lg:rounded-3xl lg:ring-1 lg:ring-white/[0.07]" tabIndex={-1}>
           {/* Mobile top bar */}
           <header className="glass sticky top-0 z-20 flex items-center justify-between border-b border-white/5 px-4 py-3 lg:hidden">
-            <Link href="/" aria-label="SAHU MUSIC home, built by Sahil Thakur" className="min-w-0">
-              <Logo compact byline />
+            <Link href="/" aria-label="SAHU MUSIC home">
+              <Logo compact />
             </Link>
             <div className="flex items-center gap-1">
               <InstallButton className="!px-3 !py-1.5 text-xs" />
@@ -170,8 +170,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
           {/* Desktop top bar */}
           <header className="glass sticky top-0 z-20 hidden items-center gap-4 border-b border-white/5 px-8 py-3 lg:flex lg:rounded-t-3xl">
-            <div className="min-w-0 flex-1">{!pathname.startsWith('/search') && <QuickSearch />}</div>
-            <BuiltByBadge />
+            <div className="flex-1">{!pathname.startsWith('/search') && <QuickSearch />}</div>
             <Link href="/download" className="btn-gold !px-4 !py-2">
               <Icon name="download" size={16} /> Get the app
             </Link>
