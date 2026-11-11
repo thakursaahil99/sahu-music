@@ -93,22 +93,22 @@ function Transport({ big = false }: { big?: boolean }) {
 
 /** Persistent bar above the bottom navigation (mobile) / at the bottom of the window (desktop). */
 export function MiniPlayer() {
-  const { current, isPlaying, isLoading, toggle, next, setFullOpen, volume, setVolume, error } = usePlayer();
+  const { current, isPlaying, isLoading, toggle, next, prev, setFullOpen, volume, setVolume, error } = usePlayer();
   const { position, duration } = useProgress();
   if (!current) return null;
   const total = duration || current.duration || 0;
   const pct = total > 0 ? Math.min(100, (position / total) * 100) : 0;
 
   return (
-    <div className="glass relative z-30 mx-2 mb-2 animate-slide-up overflow-hidden rounded-2xl shadow-lift ring-1 ring-white/10 md:mx-0 md:mb-0 md:rounded-3xl" role="region" aria-label="Player">
+    <div className="glass relative z-30 mx-2 mb-2 animate-slide-up overflow-hidden rounded-2xl shadow-lift ring-1 ring-white/10 lg:mx-0 lg:mb-0 lg:rounded-3xl" role="region" aria-label="Player">
       {/* thin progress line (mobile) */}
-      <div className="absolute inset-x-0 top-0 h-0.5 bg-coal-line md:hidden">
+      <div className="absolute inset-x-0 top-0 h-0.5 bg-coal-line lg:hidden">
         <div className="h-full bg-gradient-to-r from-gold-deep via-gold to-gold-soft shadow-glow transition-[width] duration-300" style={{ width: `${pct}%` }} />
       </div>
-      <div className="flex items-center gap-3 px-3 py-2 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)] md:gap-6 md:px-5 md:py-3">
+      <div className="flex items-center gap-3 px-3 py-2 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)] lg:gap-6 lg:px-5 lg:py-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <button type="button" onClick={() => setFullOpen(true)} className="flex min-w-0 flex-1 items-center gap-3 text-left md:flex-none" aria-label="Open full player">
-            <Artwork src={current.artwork} alt="" size="sm" rounded="rounded-xl" className={`h-11 w-11 shrink-0 transition md:h-14 md:w-14 ${isPlaying ? 'shadow-glow ring-1 ring-gold/50' : ''}`} />
+          <button type="button" onClick={() => setFullOpen(true)} className="flex min-w-0 flex-1 items-center gap-3 text-left" aria-label="Open full player">
+            <Artwork src={current.artwork} alt="" size="sm" rounded="rounded-xl" className={`h-11 w-11 shrink-0 transition lg:h-14 lg:w-14 ${isPlaying ? 'shadow-glow ring-1 ring-gold/50' : ''}`} />
             <span className="min-w-0">
               <span className="block truncate text-sm font-semibold text-white">{current.title}</span>
               <span className={`block truncate text-xs ${error ? 'text-red-400' : 'text-muted'}`}>
@@ -116,27 +116,30 @@ export function MiniPlayer() {
               </span>
             </span>
           </button>
-          <span className="hidden md:block">
+          <span className="hidden shrink-0 lg:block">
             <FavoriteButton track={current} />
           </span>
         </div>
 
-        <div className="hidden flex-col items-center gap-1 md:flex">
+        <div className="hidden flex-col items-center gap-1 lg:flex">
           <Transport />
           <SeekBar />
         </div>
 
-        <div className="flex items-center justify-end gap-1 md:gap-2">
-          <span className="md:hidden">
+        <div className="flex items-center justify-end gap-1 lg:gap-2">
+          <span className="lg:hidden">
             <FavoriteButton track={current} />
           </span>
-          <button type="button" onClick={toggle} aria-label={isPlaying ? 'Pause' : 'Play'} className="icon-btn text-white md:hidden">
+          <button type="button" onClick={prev} aria-label="Previous" className="icon-btn hidden text-white sm:inline-flex lg:hidden">
+            <Icon name="prev" size={22} />
+          </button>
+          <button type="button" onClick={toggle} aria-label={isPlaying ? 'Pause' : 'Play'} className="icon-btn text-white lg:hidden">
             {isLoading ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <Icon name={isPlaying ? 'pause' : 'play'} size={24} />}
           </button>
-          <button type="button" onClick={next} aria-label="Next" className="icon-btn text-white md:hidden">
+          <button type="button" onClick={next} aria-label="Next" className="icon-btn text-white lg:hidden">
             <Icon name="next" size={22} />
           </button>
-          <div className="hidden items-center gap-2 md:flex">
+          <div className="hidden items-center gap-2 lg:flex">
             <Icon name="volume" size={18} className="text-muted" />
             <input
               type="range"

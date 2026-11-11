@@ -54,7 +54,7 @@ export function VideoStage() {
           : inSlot
             ? 'fixed z-[55] overflow-hidden rounded-2xl bg-black shadow-glow-lg ring-1 ring-white/10'
             : // floating dock above the mini player (and above the bottom navigation on phones)
-              'fixed bottom-[8.75rem] left-3 right-3 z-40 overflow-hidden rounded-2xl bg-black shadow-lift ring-1 ring-gold/30 animate-pop-in md:bottom-[6.5rem] md:left-auto md:right-5 md:w-[22.25rem]'
+              'fixed bottom-[8.75rem] left-3 right-3 z-40 overflow-hidden rounded-2xl bg-black shadow-lift ring-1 ring-gold/30 animate-pop-in lg:bottom-[6.5rem] lg:left-auto lg:right-5 lg:w-[22.25rem]'
       }
     >
       {video && !inSlot && (

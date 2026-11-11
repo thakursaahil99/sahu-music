@@ -9,7 +9,7 @@ import { useOnline } from '@/lib/hooks';
 import { music } from '@/lib/music';
 import { usePlayer } from '@/lib/player';
 import { Icon, type IconName } from './icons';
-import { Logo } from './Logo';
+import { BuiltByBadge, Logo } from './Logo';
 import { FullPlayer, MiniPlayer } from './players';
 import { usePwaInstall } from './Pwa';
 import { VideoStage } from './VideoStage';
@@ -89,7 +89,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const sideLink = 'flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-white/70 transition hover:bg-white/[0.06] hover:text-white';
 
   return (
-    <div className="relative flex h-dvh flex-col overflow-hidden bg-ink md:gap-2 md:p-2">
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-ink lg:gap-2 lg:p-2">
       {/* ambient glow behind everything (decorative) */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
         <div className="ambient ambient-a" />
@@ -99,9 +99,9 @@ export function Shell({ children }: { children: ReactNode }) {
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[90] focus:rounded focus:bg-gold focus:px-3 focus:py-2 focus:text-ink">
         Skip to content
       </a>
-      <div className="relative flex min-h-0 flex-1 md:gap-2">
+      <div className="relative flex min-h-0 flex-1 lg:gap-2">
         {/* Desktop sidebar: a floating panel */}
-        <aside className="panel hidden w-64 shrink-0 flex-col overflow-y-auto p-5 backdrop-blur-xl md:flex">
+        <aside className="panel hidden w-64 shrink-0 flex-col overflow-y-auto p-5 backdrop-blur-xl lg:flex">
           <Link href="/" aria-label="SAHU MUSIC home" className="transition hover:opacity-90">
             <Logo />
           </Link>
@@ -148,11 +148,11 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </aside>
 
-        <main id="main" ref={mainRef} className="main-panel min-w-0 flex-1 overflow-y-auto md:rounded-3xl md:ring-1 md:ring-white/[0.07]" tabIndex={-1}>
+        <main id="main" ref={mainRef} className="main-panel min-w-0 flex-1 overflow-y-auto lg:rounded-3xl lg:ring-1 lg:ring-white/[0.07]" tabIndex={-1}>
           {/* Mobile top bar */}
-          <header className="glass sticky top-0 z-20 flex items-center justify-between border-b border-white/5 px-4 py-3 md:hidden">
-            <Link href="/" aria-label="SAHU MUSIC home">
-              <Logo compact />
+          <header className="glass sticky top-0 z-20 flex items-center justify-between border-b border-white/5 px-4 py-3 lg:hidden">
+            <Link href="/" aria-label="SAHU MUSIC home, built by Sahil Thakur" className="min-w-0">
+              <Logo compact byline />
             </Link>
             <div className="flex items-center gap-1">
               <InstallButton className="!px-3 !py-1.5 text-xs" />
@@ -169,8 +169,9 @@ export function Shell({ children }: { children: ReactNode }) {
           </header>
 
           {/* Desktop top bar */}
-          <header className="glass sticky top-0 z-20 hidden items-center gap-4 border-b border-white/5 px-8 py-3 md:flex md:rounded-t-3xl">
-            <div className="flex-1">{!pathname.startsWith('/search') && <QuickSearch />}</div>
+          <header className="glass sticky top-0 z-20 hidden items-center gap-4 border-b border-white/5 px-8 py-3 lg:flex lg:rounded-t-3xl">
+            <div className="min-w-0 flex-1">{!pathname.startsWith('/search') && <QuickSearch />}</div>
+            <BuiltByBadge />
             <Link href="/download" className="btn-gold !px-4 !py-2">
               <Icon name="download" size={16} /> Get the app
             </Link>
@@ -188,11 +189,11 @@ export function Shell({ children }: { children: ReactNode }) {
           )}
 
           {/* keyed by route so every page fades up as it opens */}
-          <div key={pathname} className="mx-auto w-full max-w-[1500px] animate-fade-up px-4 py-6 md:px-8 md:py-8">
+          <div key={pathname} className="mx-auto w-full max-w-[1500px] animate-fade-up px-4 py-6 lg:px-8 lg:py-8">
             {children}
           </div>
 
-          <footer className="mx-auto w-full max-w-[1500px] border-t border-white/5 px-4 py-8 text-xs text-muted md:px-8">
+          <footer className="mx-auto w-full max-w-[1500px] border-t border-white/5 px-4 py-8 text-xs text-muted lg:px-8">
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
               <span>© {new Date().getFullYear()} SAHU MUSIC · Har Gaana, Ek Jagah.</span>
               <Link href="/about" className="hover:text-white">About</Link>
@@ -209,7 +210,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <MiniPlayer />
 
       {/* Mobile bottom navigation */}
-      <nav className="pb-safe relative grid grid-cols-4 border-t border-white/5 bg-black/80 backdrop-blur-xl md:hidden" aria-label="Main">
+      <nav className="pb-safe relative grid grid-cols-4 border-t border-white/5 bg-black/80 backdrop-blur-xl lg:hidden" aria-label="Main">
         {NAV.map((n) => (
           <Link
             key={n.href}
