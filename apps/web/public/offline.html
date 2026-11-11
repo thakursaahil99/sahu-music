@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#050505" />
+    <title>Offline · SAHU MUSIC</title>
+    <style>
+      html, body { height: 100%; margin: 0; background: #050505; color: #fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+      main { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; box-sizing: border-box; }
+      img { width: 96px; height: 96px; }
+      h1 { font-size: 22px; margin: 20px 0 8px; }
+      p { color: #a3a3a3; max-width: 360px; line-height: 1.5; margin: 0 0 24px; }
+      button { background: #d7ae55; color: #050505; border: 0; border-radius: 999px; padding: 12px 28px; font-weight: 700; font-size: 15px; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/logo.svg" alt="SAHU MUSIC" />
+      <h1>You are offline</h1>
+      <p>SAHU MUSIC streams music over the internet. Reconnect to keep listening. Pages you have already opened are still available.</p>
+      <button onclick="location.reload()">Try again</button>
+    </main>
+  </body>
+</html>

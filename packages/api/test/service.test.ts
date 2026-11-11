@@ -1,0 +1,111 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { clearApiCache, createMusicService, DemoProvider, synthWav } from '../src';
+
+const track = (id: string, over: Record<string, unknown> = {}) => ({
+  id,
+  title: `Song ${id}`,
+  duration: 100,
+  is_streamable: true,
+  is_stream_gated: false,
+  user: { id: 'u1', name: 'A' },
+  ...over,
+});
+const respond = (data: unknown, status = 200) =>
+  new Response(JSON.stringify({ data }), { status, headers: { 'Content-Type': 'application/json' } });
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  clearApiCache();
+});
+
+describe('MusicService', () => {
+  it('returns only playable tracks from the provider', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => respond([track('a1'), track('b2', { is_stream_gated: true }), track('c3')])));
+    const music = createMusicService();
+    const list = await music.getTrending({ limit: 3 });
+    expect(list.map((t) => t.providerTrackId)).toEqual(['a1', 'c3']);
+    expect(music.isDemoMode()).toBe(false);
+  });
+
+  it('removes admin-blocked tracks', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => respond([track('a1'), track('c3')])));
+    const music = createMusicService();
+    music.setBlocklist(['audius:a1']);
+    expect((await music.searchTracks('x')).map((t) => t.providerTrackId)).toEqual(['c3']);
+  });
+
+  it('sends the search query URL-encoded to the Audius search endpoint', async () => {
+    const f = vi.fn(async (_url: string) => respond([]));
+    vi.stubGlobal('fetch', f);
+    await createMusicService().searchTracks('hindi & more');
+    expect(String(f.mock.calls[0][0])).toContain('/v1/tracks/search?query=hindi%20%26%20more');
+  });
+
+  it('falls back to demo mode with original sample audio when the provider is unreachable', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new TypeError('network down');
+    }));
+    const music = createMusicService();
+    const list = await music.getTrending();
+    expect(music.isDemoMode()).toBe(true);
+    expect(list.length).toBeGreaterThan(0);
+    expect(list.every((t) => t.provider === 'demo' && t.artist === 'SAHU MUSIC Demo')).toBe(true);
+  }, 20_000);
+
+  it('does not query a provider an admin has disabled', async () => {
+    const f = vi.fn(async () => respond([track('a1')]));
+    vi.stubGlobal('fetch', f);
+    const music = createMusicService();
+    music.setDisabledProviders(['audius', 'itunes', 'radio', 'archive']);
+    await music.getTrending();
+    expect(f).not.toHaveBeenCalled();
+    expect(music.isDemoMode()).toBe(true);
+  });
+
+  it('never returns or plays a 30-second preview clip by default', async () => {
+    const f = vi.fn(async (_url: string) => respond([track('a1')]));
+    vi.stubGlobal('fetch', f);
+    const music = createMusicService();
+    expect(music.previewsAllowed).toBe(false);
+    await music.searchTracks('arijit');
+    // the preview provider is not even queried
+    expect(f.mock.calls.every(([url]) => !String(url).includes('itunes.apple.com'))).toBe(true);
+
+    // a preview-only track saved earlier is refused, with a reason a listener can understand
+    const full = (await music.getTrending())[0];
+    const saved = { ...full, provider: 'itunes' as const, providerTrackId: '123', preview: true, duration: 30, streamUrl: 'https://audio-ssl.itunes.apple.com/x.m4a' };
+    expect(music.isTrackPlayable(saved)).toBe(false);
+    expect(music.unavailableReason(saved)).toMatch(/30-second preview/);
+    expect(music.isTrackPlayable(full)).toBe(true);
+    expect(music.unavailableReason(full)).toBeNull();
+  });
+
+  it('plays preview clips only when the operator explicitly opts in', () => {
+    const optIn = createMusicService({ itunesPreviews: true });
+    expect(optIn.previewsAllowed).toBe(true);
+    expect(optIn.status().find((p) => p.id === 'itunes')?.configured).toBe(true);
+    expect(createMusicService().status().find((p) => p.id === 'itunes')?.configured).toBe(false);
+  });
+
+  it('reports Jamendo as not configured without a client id', () => {
+    const jamendo = createMusicService().status().find((p) => p.id === 'jamendo')!;
+    expect(jamendo.configured).toBe(false);
+    expect(jamendo.configHint).toMatch(/JAMENDO_CLIENT_ID/);
+  });
+});
+
+describe('demo audio', () => {
+  it('synthesizes a valid PCM WAV', () => {
+    const wav = synthWav({ bpm: 120, root: 220, notes: [0, 4, 7, null], wave: 'sine' }, 1);
+    const tag = (o: number) => String.fromCharCode(...wav.slice(o, o + 4));
+    expect(tag(0)).toBe('RIFF');
+    expect(tag(8)).toBe('WAVE');
+    expect(new DataView(wav.buffer).getUint32(40, true)).toBe(wav.length - 44);
+  });
+
+  it('labels every demo item as demo with CC0 rights', async () => {
+    const tracks = await new DemoProvider().getTrending();
+    expect(tracks).toHaveLength(3);
+    expect(tracks.every((t) => t.title.startsWith('Demo Tone') && t.rights.license?.includes('CC0'))).toBe(true);
+  });
+});

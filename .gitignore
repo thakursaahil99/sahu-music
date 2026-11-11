@@ -1,0 +1,21 @@
+node_modules/
+.next/
+.next-dev/
+out/
+dist/
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+Thumbs.db
+.vercel/
+.wrangler/
+supabase/.temp/
+supabase/.branches/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# Built APK copied in by "npm run apk" (large binary; host it or rebuild instead of committing)
+apps/web/public/downloads/*.apk
