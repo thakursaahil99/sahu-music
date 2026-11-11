@@ -3,12 +3,13 @@ import { Plus_Jakarta_Sans } from 'next/font/google';
 import type { ReactNode } from 'react';
 import { Providers } from '@/components/Providers';
 import { Shell } from '@/components/Shell';
+import { env } from '@/lib/config';
 import './globals.css';
 
 /** Self-hosted at build time by next/font (no request to Google from the visitor's browser). */
 const sans = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-sans' });
 
-const siteUrl =process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+const siteUrl = env.siteUrl;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

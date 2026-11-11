@@ -1,3 +1,26 @@
+/**
+ * Public address of the site, without a trailing slash, for metadata and the sitemap.
+ * NEXT_PUBLIC_SITE_URL wins; on Vercel the production domain is used automatically.
+ * A malformed value (stray spaces, an invisible BOM) never breaks the build.
+ */
+function resolveSiteUrl(): string {
+  const candidates = [
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL && `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`,
+  ];
+  for (const raw of candidates) {
+    const value = raw?.replace(/^﻿/, '').trim();
+    if (!value) continue;
+    try {
+      const url = new URL(value);
+      if (url.protocol === 'https:' || url.protocol === 'http:') return url.origin;
+    } catch {
+      // ignore and try the next candidate
+    }
+  }
+  return 'http://localhost:3000';
+}
+
 /** Public runtime configuration. Only NEXT_PUBLIC_* values exist in the browser bundle. */
 export const env = {
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || '',
@@ -16,7 +39,7 @@ export const env = {
   radio: process.env.NEXT_PUBLIC_RADIO !== 'false',
   archive: process.env.NEXT_PUBLIC_ARCHIVE !== 'false',
   demoMode: process.env.NEXT_PUBLIC_DEMO_MODE === 'true',
-  siteUrl: process.env.NEXT_PUBLIC_SITE_URL?.trim() || 'http://localhost:3000',
+  siteUrl: resolveSiteUrl(),
   adsenseClient: process.env.NEXT_PUBLIC_ADSENSE_CLIENT?.trim() || '',
   adsenseSlot: process.env.NEXT_PUBLIC_ADSENSE_SLOT?.trim() || '',
 };
