@@ -8,7 +8,8 @@
  *   - audio. Streams always go straight to the network; copyrighted audio is
  *     not stored or redistributed by this app.
  *
- * Bump VERSION on every deploy that changes this file to trigger the update notice.
+ * scripts/build-site.mjs appends the deploy's commit to VERSION, so every deploy changes this
+ * file and installed apps show the "new version available" notice.
  */
 const VERSION = 'v1.4.0';
 const SHELL = `sahu-shell-${VERSION}`;
