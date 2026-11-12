@@ -57,9 +57,9 @@ npm run build:web
 
 Cloudflare Pages rejects files over 25 MiB. The arm64 APK is about 22 MiB today; the script warns if it grows past the limit. Because the APK is ignored by git, a Pages build from GitHub will not contain it, so for that setup use the second way.
 
-**Hosted elsewhere** (recommended with GitHub-based deploys): attach the APK to a GitHub Release and set `NEXT_PUBLIC_APK_URL` to the asset's `https://` link.
+**Hosted elsewhere** (recommended with GitHub-based deploys): attach the APK to a GitHub Release and set `NEXT_PUBLIC_APK_URL` to the asset's `https://` link. The live site uses `https://github.com/<you>/sahu-music/releases/latest/download/sahu-music.apk`, which always points at the newest release, so a new release needs no website rebuild.
 
-Before giving the APK to the public, sign it with your own keystore (`apps/mobile/android/app/build.gradle.kts` currently signs release builds with the debug key). Updates must be signed with the same key or Android will refuse to install them over the old version.
+**Signing.** Release builds are signed with the key named in `apps/mobile/android/key.properties` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`); without that file they fall back to the debug key. `key.properties` and keystores are ignored by git. Keep a private backup of the keystore and its password: every update must be signed with the same key, or Android refuses to install it over the old version.
 
 ## 6. iOS
 

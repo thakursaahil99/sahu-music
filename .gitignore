@@ -22,3 +22,8 @@ apps/web/public/downloads/*.apk
 
 .vercel
 .env*
+
+# Android release signing (keep a private backup; never commit)
+key.properties
+*.jks
+*.keystore
