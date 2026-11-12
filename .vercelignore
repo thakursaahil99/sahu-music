@@ -9,6 +9,4 @@ dist
 *.log
 apps/mobile
 apps/web/public/downloads/*.apk
-supabase/.temp
-supabase/.branches
 coverage

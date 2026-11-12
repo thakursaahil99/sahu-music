@@ -42,8 +42,8 @@ These cannot be automated from this repository.
 **iOS app** (Mac with Xcode)
 - [ ] `flutter run` on a device; background audio and Control Centre controls work.
 
-**Accounts and admin** (Supabase configured)
-- [ ] Sign up, confirm email, log in; library syncs between website and app.
+**Accounts and admin** (automated part: `npm run test:backend -- https://sahu-music.vercel.app`)
+- [ ] Sign up, log in; library syncs between website and app.
 - [ ] A second account cannot see the first account's private playlists.
 - [ ] A non-admin account is refused by the admin dashboard.
 - [ ] Admin: sync tracks → they are pending → approve one → it appears under "Verified by SAHU MUSIC".

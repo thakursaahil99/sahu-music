@@ -114,7 +114,7 @@ export interface PageOpts {
   sort?: 'popular';
 }
 
-/** A playlist owned by a SAHU MUSIC user (local guest storage or Supabase). */
+/** A playlist owned by a SAHU MUSIC user (local guest storage or the account backend). */
 export interface UserPlaylist {
   id: string;
   title: string;

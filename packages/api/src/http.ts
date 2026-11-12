@@ -20,7 +20,7 @@ export interface ApiErrorReport {
 }
 
 let reporter: ((e: ApiErrorReport) => void) | null = null;
-/** Apps register a reporter (e.g. insert into Supabase `api_errors`) for admin monitoring. */
+/** Apps register a reporter (e.g. POST to the backend error log) for admin monitoring. */
 export function setErrorReporter(fn: ((e: ApiErrorReport) => void) | null): void {
   reporter = fn;
 }

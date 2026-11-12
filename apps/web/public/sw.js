@@ -156,7 +156,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 6. Music provider metadata (JSON). Supabase/auth/ads requests are left alone.
+  // 6. Music provider metadata (JSON). Account API and ads requests are left alone.
   if (url.hostname === 'api.audius.co' || url.hostname === 'api.jamendo.com' || url.hostname === 'itunes.apple.com') {
     event.respondWith(networkFirst(request, META, META_MAX, 8000).catch(() => new Response(JSON.stringify({ data: [] }), { status: 504, headers: { 'Content-Type': 'application/json' } })));
   }

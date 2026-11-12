@@ -4,7 +4,8 @@
 //   npm run apk -- --copy   only copy an APK that is already built
 //
 // Pass app configuration through the environment (all optional):
-//   SUPABASE_URL, SUPABASE_ANON_KEY, AUDIUS_APP_NAME, ADS_ENABLED, ADMOB_BANNER_ANDROID
+//   API_BASE_URL (your SAHU MUSIC website, for accounts; default https://sahu-music.vercel.app),
+//   YOUTUBE_API_KEY, AUDIUS_APP_NAME, ADS_ENABLED, ADMOB_BANNER_ANDROID
 //
 // The arm64 APK is used (covers practically every Android phone sold since 2017) because
 // Cloudflare Pages rejects files over 25 MiB. If the APK is larger than that, host it elsewhere
@@ -27,8 +28,8 @@ function fromWebEnv(name) {
   return m ? m[1].trim() : '';
 }
 const settings = {
-  SUPABASE_URL: process.env.SUPABASE_URL || fromWebEnv('NEXT_PUBLIC_SUPABASE_URL'),
-  SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || fromWebEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
+  // only a public https address is reachable from a phone; otherwise the app's default (the live site) is used
+  API_BASE_URL: process.env.API_BASE_URL || (/^https:\/\//.test(fromWebEnv('NEXT_PUBLIC_SITE_URL')) ? fromWebEnv('NEXT_PUBLIC_SITE_URL').replace(/\/$/, '') : ''),
   YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY || fromWebEnv('NEXT_PUBLIC_YOUTUBE_API_KEY'),
   AUDIUS_APP_NAME: process.env.AUDIUS_APP_NAME,
   ADS_ENABLED: process.env.ADS_ENABLED,

@@ -11,7 +11,7 @@ Optional build-time settings (`--dart-define=NAME=value`):
 
 | Name | Purpose |
 | --- | --- |
-| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | Accounts and synced library. Anon key only. Without them the app runs in guest mode. |
+| `API_BASE_URL` | The SAHU MUSIC website whose `/api` holds accounts and synced libraries. Default `https://sahu-music.vercel.app`. The app only ever holds the signed-in user's session token, never database credentials. |
 | `YOUTUBE_API_KEY` | Original film songs. They open on a YouTube video screen (visible, no background play, as YouTube requires). Without it, the rest of the app works. |
 | `AUDIUS_APP_NAME` | Name reported to Audius. |
 | `DEMO_MODE=true` | Use the built-in original sample audio only. |

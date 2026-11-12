@@ -1,5 +1,5 @@
 /// Domain models – mirror `packages/models` used by the website so that
-/// snapshots stored in Supabase are interchangeable between platforms.
+/// snapshots stored in the account backend are interchangeable between platforms.
 library;
 
 enum Permission { allowed, notAllowed, unconfirmed }

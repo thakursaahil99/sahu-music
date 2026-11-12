@@ -3,10 +3,9 @@ import 'dart:io' show Platform;
 /// Build-time configuration, passed with `--dart-define` (see README).
 /// Everything is optional: with nothing set the app runs in guest mode on Audius.
 class AppConfig {
-  static const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-
-  /// The ANON (public) key only. Never ship a service-role key in an app.
-  static const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  /// The SAHU MUSIC website, whose /api/v1 backend (Neon database) holds accounts and libraries.
+  /// The app never holds database credentials, only the signed-in user's session token.
+  static const apiBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'https://sahu-music.vercel.app');
   static const audiusAppName = String.fromEnvironment('AUDIUS_APP_NAME', defaultValue: 'SAHU_MUSIC');
   static const forceDemo = bool.fromEnvironment('DEMO_MODE');
 
@@ -19,8 +18,9 @@ class AppConfig {
   static const _bannerAndroid = String.fromEnvironment('ADMOB_BANNER_ANDROID');
   static const _bannerIos = String.fromEnvironment('ADMOB_BANNER_IOS');
 
-  static bool get supabaseConfigured =>
-      supabaseUrl.startsWith('http') && supabaseAnonKey.isNotEmpty && !supabaseAnonKey.startsWith('sb_secret_');
+  /// Accounts are on when the backend address is HTTPS (or a local address during development).
+  static bool get backendConfigured =>
+      apiBaseUrl.startsWith('https://') || apiBaseUrl.startsWith('http://10.0.2.2') || apiBaseUrl.startsWith('http://localhost');
 
   /// Falls back to Google's public TEST banner units so development never serves live ads.
   static String get bannerUnitId {

@@ -440,7 +440,7 @@ class LibraryScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(color: Brand.gold.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
               child: Text(
-                AppConfig.supabaseConfigured
+                AppConfig.backendConfigured
                     ? 'Guest mode: your library is saved on this device. Log in from Settings to sync it.'
                     : 'Guest mode: your library is saved on this device.',
                 style: const TextStyle(color: Brand.goldSoft, fontSize: 13),
@@ -535,9 +535,9 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(padding: const EdgeInsets.only(bottom: 24), children: [
         header('Account'),
         if (user != null) ...[
-          ListTile(leading: const Icon(Icons.person_rounded), title: Text(user.email ?? 'Signed in'), subtitle: const Text('Library synced to your account', style: TextStyle(color: Brand.muted))),
+          ListTile(leading: const Icon(Icons.person_rounded), title: Text(user.email), subtitle: const Text('Library synced to your account', style: TextStyle(color: Brand.muted))),
           ListTile(leading: const Icon(Icons.logout_rounded), title: const Text('Log out'), onTap: () => ref.read(authProvider.notifier).signOut()),
-        ] else if (AppConfig.supabaseConfigured)
+        ] else if (AppConfig.backendConfigured)
           ListTile(
             leading: const Icon(Icons.login_rounded),
             title: const Text('Log in or sign up'),
@@ -548,7 +548,7 @@ class SettingsScreen extends ConsumerWidget {
           const ListTile(
             leading: Icon(Icons.info_outline_rounded, color: Brand.gold),
             title: Text('Guest mode'),
-            subtitle: Text('Accounts are not configured in this build. Build with SUPABASE_URL and SUPABASE_ANON_KEY to enable login (see README).',
+            subtitle: Text('Accounts are not configured in this build. Build with API_BASE_URL set to your SAHU MUSIC website to enable login (see README).',
                 style: TextStyle(color: Brand.muted)),
           ),
         header('Playback'),

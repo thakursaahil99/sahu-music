@@ -11,8 +11,6 @@ dist/
 Thumbs.db
 .vercel/
 .wrangler/
-supabase/.temp/
-supabase/.branches/
 coverage/
 *.tsbuildinfo
 next-env.d.ts

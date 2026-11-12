@@ -1,17 +1,20 @@
 # SAHU MUSIC
 
-**Har Gaana, Ek Jagah.** A free-first music streaming ecosystem: website, installable PWA, Android and iOS apps, and an admin dashboard, all on one Supabase backend.
+**Har Gaana, Ek Jagah.** A free-first music streaming ecosystem: website, installable PWA, Android and iOS apps, and an admin dashboard, all on one backend: a Vercel Function with a Neon PostgreSQL database.
+
+Live: **https://sahu-music.vercel.app** · admin console: **https://sahu-music.vercel.app/admin/**
 
 Every song plays **in full**. The app only lists tracks whose source authorises complete streaming.
 
 | Part | Folder | Stack |
 | --- | --- | --- |
 | Website + PWA | `apps/web` | Next.js 15 (static export), React 19, TypeScript, Tailwind |
-| Admin dashboard | `apps/admin` | Next.js 15 (static export) |
+| Admin dashboard (served at `/admin`) | `apps/admin` | Next.js 15 (static export) |
 | Android / iOS app | `apps/mobile` | Flutter, Riverpod, just_audio, audio_service |
 | Music providers, rights checks, search ranking | `packages/api` | TypeScript |
 | Shared models and branding | `packages/models`, `packages/shared` | TypeScript |
-| Database, RLS, edge function | `supabase` | PostgreSQL |
+| Backend API: accounts, libraries, admin | `api` | Vercel Function (Node), TypeScript |
+| Database schema | `db/migrations` | PostgreSQL on Neon |
 
 ## What you need to know first
 
@@ -27,7 +30,7 @@ Every song plays **in full**. The app only lists tracks whose source authorises 
 
 ## Quick start (website)
 
-Requires Node.js 18.18 or newer.
+Requires Node.js 22 or newer.
 
 ```bash
 npm install
@@ -36,10 +39,12 @@ npm run dev          # http://localhost:3000
 
 That is enough to browse, search and play music. Favourites, playlists and history are saved in the browser.
 
-Admin dashboard (needs Supabase, see below):
+Accounts and the admin console need the backend and its database. To run everything locally exactly as on Vercel (website, `/admin` and `/api`):
 
 ```bash
-npm run dev:admin    # http://localhost:3001
+vercel env pull .env.neon                  # the Neon connection string from the linked Vercel project
+npm run build:site
+npm run serve -- --env-file .env.neon      # http://localhost:3000
 ```
 
 ## Original film songs (YouTube) in one step
@@ -54,11 +59,10 @@ It checks the key, saves it to `apps/web/.env.local`, builds the Android APK wit
 
 ## Configuration
 
-Copy `.env.example` to `apps/web/.env.local` (and to `apps/admin/.env.local` for the admin app). Every variable is optional.
+Copy `.env.example` to `apps/web/.env.local`. Every variable is optional.
 
 | Variable | Purpose |
 | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Accounts, synced library, admin dashboard. Use the **anon** key only. |
 | `NEXT_PUBLIC_AUDIUS_APP_NAME` | Name your client reports to Audius. |
 | `NEXT_PUBLIC_YOUTUBE_API_KEY` | Original film songs in YouTube's official player. Free; restrict it to your site's address. See [docs/MUSIC-SOURCES.md](docs/MUSIC-SOURCES.md). |
 | `NEXT_PUBLIC_RADIO`, `NEXT_PUBLIC_ARCHIVE` | `false` switches off live radio or the Internet Archive. Both on by default. |
@@ -69,29 +73,26 @@ Copy `.env.example` to `apps/web/.env.local` (and to `apps/admin/.env.local` for
 | `NEXT_PUBLIC_SITE_URL` | Public URL, used for SEO metadata and the sitemap. |
 | `NEXT_PUBLIC_ADSENSE_CLIENT`, `NEXT_PUBLIC_ADSENSE_SLOT` | Optional display ad slot. Empty means no ad code is loaded. |
 
-Never put the Supabase `service_role` key in any app. Both web apps refuse to start a client with it.
+The database connection string (`DATABASE_URL`) is a server-only secret. It is set by the Vercel Neon integration and used only by the API in `/api`; it never appears in the website, the admin console or the mobile app.
 
-## Supabase (free tier)
+## Backend: accounts, libraries and admin (Vercel + Neon, free tiers)
 
-1. Create a project at supabase.com.
-2. In the SQL editor run the files in `supabase/migrations` in order (`…0001_schema.sql` → `…0004_…`).
-3. Put the project URL and anon key in the `.env.local` files.
-4. Create the main admin account. With the `service_role` key set for the current terminal only (`SUPABASE_SERVICE_ROLE_KEY`):
+- **API:** one Vercel Function, `api/server.ts`, answers everything under `/api/v1/` (sign-up, log-in, favourites, playlists, history, preferences, admin). It runs in Singapore (`sin1`), next to the database.
+- **Database:** Neon PostgreSQL, added through the Vercel Marketplace (Storage → Neon, free plan), which sets `DATABASE_URL` for the project. The schema in `db/migrations` is applied automatically on every Vercel build (`npm run db:migrate`).
+- **Accounts:** passwords are stored only as salted scrypt hashes. The website and admin console use an HttpOnly, Secure, SameSite cookie; the mobile app gets a session token. Sessions are stored server-side (hashed), so logging out, changing the password, blocking a user or deleting the account ends them at once.
+- **Access rules:** every library request is limited to the signed-in user; admin endpoints check the admin role on every request and can only touch whitelisted tables and columns. Writes from other websites are refused. Failed log-ins are rate-limited.
+- **Rights:** a database trigger refuses to make a song public unless it has an approved rights record with streaming permission, and un-publishes it if that approval is withdrawn.
 
-   ```bash
-   npm run admin -- you@example.com YourPassword
-   ```
+**Make yourself the administrator** (once):
 
-   This creates the account (or resets its password) and grants the admin role. Alternatively sign up in the website and promote the account in the SQL editor:
+```bash
+npm run admin -- you@example.com YourPassword    # creates the account (or resets its password) and makes it admin
+npm run admin -- you@example.com                 # or: promote an account that already signed up on the website
+```
 
-   ```sql
-   update public.profiles set role = 'admin'
-   where id = (select id from auth.users where email = 'you@example.com');
-   ```
+The script fetches the database address from the linked Vercel project by itself. Then sign in at `/admin`.
 
-5. Optional: `supabase functions deploy sync-catalogue` for server-side catalogue sync.
-
-Row Level Security is on for every table. Guests read only publicly approved data; users change only their own playlists, favourites, history and preferences; only admins manage the catalogue. A database trigger refuses to make a song public unless it has an approved rights record with streaming permission.
+There is no email service yet, so "forgot password" cannot send a reset link; an admin can reset a password with `npm run admin -- EMAIL NEWPASSWORD`.
 
 ## Mobile app (Flutter)
 
@@ -99,7 +100,7 @@ Row Level Security is on for every table. Guests read only publicly approved dat
 cd apps/mobile
 flutter pub get
 flutter run                      # guest mode on Audius
-flutter run --dart-define=SUPABASE_URL=https://xxx.supabase.co --dart-define=SUPABASE_ANON_KEY=xxx
+flutter run --dart-define=API_BASE_URL=https://sahu-music.vercel.app   # accounts (this is also the default)
 ```
 
 Other defines: `YOUTUBE_API_KEY` (original film songs, played on their own video screen), `AUDIUS_APP_NAME`, `DEMO_MODE=true`, `ADS_ENABLED=true`, `ADMOB_BANNER_ANDROID`, `ADMOB_BANNER_IOS`.
@@ -115,6 +116,7 @@ npm test                 # unit tests: rights checks, providers, search ranking,
 npm run test:api         # live check of every Audius endpoint the apps use
 npm run test:playback    # live check that stream URLs are complete songs, not clips
 npm run build:web && npm run test:e2e   # real browser: plays tracks, passes 30 s, plays to the end, search
+npm run test:backend -- https://sahu-music.vercel.app   # accounts API end to end (creates and deletes a test account)
 cd apps/mobile && flutter test
 ```
 
@@ -122,7 +124,7 @@ Details and the manual checklist for device testing are in [docs/TESTING.md](doc
 
 ## Deployment
 
-Static hosting on Cloudflare Pages, backend on Supabase, source on GitHub. Step by step in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+Vercel (website, admin console and API) with a Neon database, source on GitHub: every push to `main` deploys. Step by step in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Project layout
 
@@ -130,6 +132,7 @@ Static hosting on Cloudflare Pages, backend on Supabase, source on GitHub. Step 
 apps/web        website + PWA          apps/admin     admin dashboard
 apps/mobile     Flutter app            packages/api   providers, rights, ranking
 packages/models shared types           packages/shared branding, categories, validation
-supabase        migrations + functions scripts        icons, APK, live tests
+api             backend (Vercel Function)  db           database migrations
+scripts         build, admin, APK, live tests
 docs            deployment, sources, testing
 ```

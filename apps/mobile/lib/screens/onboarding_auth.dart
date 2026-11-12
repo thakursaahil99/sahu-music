@@ -124,7 +124,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             child: last
                 ? Column(children: [
                     SizedBox(width: double.infinity, child: FilledButton(onPressed: _finish, child: const Text('Continue as guest'))),
-                    if (AppConfig.supabaseConfigured) ...[
+                    if (AppConfig.backendConfigured) ...[
                       const SizedBox(height: 10),
                       SizedBox(
                         width: double.infinity,

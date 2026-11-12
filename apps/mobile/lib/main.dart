@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'config.dart';
 import 'screens/onboarding_auth.dart';
@@ -18,11 +17,6 @@ Future<void> main() async {
   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light.copyWith(systemNavigationBarColor: const Color(0xFF0A0A0A)));
 
   final prefs = await SharedPreferences.getInstance();
-
-  // Optional backend. Without it the app runs in guest mode.
-  if (AppConfig.supabaseConfigured) {
-    await Supabase.initialize(url: AppConfig.supabaseUrl, publishableKey: AppConfig.supabaseAnonKey);
-  }
 
   // Background playback, media notification and lock-screen controls.
   final handler = await AudioService.init(
