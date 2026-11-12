@@ -87,6 +87,86 @@ describe('MusicService', () => {
     expect(createMusicService().status().find((p) => p.id === 'itunes')?.configured).toBe(false);
   });
 
+  it('hands over the fast providers’ results before a slow provider answers', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        String(url).includes('archive.org')
+          ? new Promise<Response>((r) => setTimeout(() => r(new Response(JSON.stringify({ response: { docs: [] } }))), 1500))
+          : respond([track('a1', { title: 'Bhajan One' })]),
+      ),
+    );
+    const partials: { at: number; ids: string[] }[] = [];
+    const t0 = Date.now();
+    const list = await createMusicService({ radio: false }).searchTracks('bhajan', undefined, {
+      onPartial: (ts) => partials.push({ at: Date.now() - t0, ids: ts.map((t) => t.providerTrackId) }),
+    });
+    expect(partials).toHaveLength(1);
+    expect(partials[0].ids).toEqual(['a1']);
+    expect(partials[0].at).toBeLessThan(1000);
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(1400);
+    expect(list.map((t) => t.providerTrackId)).toEqual(['a1']);
+  });
+
+  it('does not ask a slow provider once a newer search has replaced this one', async () => {
+    const f = vi.fn(async (_url: string) => respond([track('a1')]));
+    vi.stubGlobal('fetch', f);
+    const askedArchive = () => f.mock.calls.some(([url]) => String(url).includes('archive.org'));
+
+    const ctrl = new AbortController();
+    const replaced = createMusicService({ radio: false }).searchTracks('bhajan', undefined, { signal: ctrl.signal });
+    ctrl.abort();
+    expect((await replaced).map((t) => t.providerTrackId)).toEqual(['a1']);
+    expect(askedArchive()).toBe(false);
+
+    clearApiCache();
+    await createMusicService({ radio: false }).searchTracks('bhajan', undefined, { signal: new AbortController().signal });
+    expect(askedArchive()).toBe(true);
+  });
+
+  it('shows the songs at once when the radio directory is stuck', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        String(url).includes('radio-browser')
+          ? new Promise<Response>(() => undefined) // never answers
+          : String(url).includes('archive.org')
+            ? new Response(JSON.stringify({ response: { docs: [] } }))
+            : respond([track('a1', { title: 'Tum Hi Ho' })]),
+      ),
+    );
+    let firstAt = -1;
+    const t0 = Date.now();
+    const list = await createMusicService().searchTracks('tum hi ho', undefined, {
+      onPartial: () => {
+        if (firstAt < 0) firstAt = Date.now() - t0;
+      },
+    });
+    expect(firstAt).toBeGreaterThanOrEqual(0);
+    expect(firstAt).toBeLessThan(1000);
+    expect(Date.now() - t0).toBeLessThan(4000); // the radio budget, not its 12 s timeout
+    expect(list.map((t) => t.providerTrackId)).toEqual(['a1']);
+  });
+
+  it('answers instantly from tracks it has already shown', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => respond([track('a1', { title: 'Kesariya' }), track('b2', { title: 'Tum Hi Ho' })])));
+    const music = createMusicService({ radio: false, archive: false });
+    expect(music.quickMatches('kesariya')).toEqual([]);
+    await music.getTrending();
+    expect(music.quickMatches('kesar').map((t) => t.providerTrackId)).toEqual(['a1']);
+    expect(music.quickMatches('tum hi').map((t) => t.providerTrackId)).toEqual(['b2']);
+    expect(music.quickMatches('tum kesariya')).toEqual([]);
+  });
+
+  it('asks only for the most played ordering when filling Hindi hits', async () => {
+    const f = vi.fn(async (_url: string) => respond([track('a1', { duration: 200 })]));
+    vi.stubGlobal('fetch', f);
+    await createMusicService().getHindiHits();
+    const searches = f.mock.calls.map(([u]) => String(u)).filter((u) => u.includes('/tracks/search'));
+    expect(searches).toHaveLength(4);
+    expect(searches.every((u) => u.includes('sort_method=popular'))).toBe(true);
+  });
+
   it('reports Jamendo as not configured without a client id', () => {
     const jamendo = createMusicService().status().find((p) => p.id === 'jamendo')!;
     expect(jamendo.configured).toBe(false);

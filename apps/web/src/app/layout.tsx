@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Plus_Jakarta_Sans } from 'next/font/google';
+import { Outfit, Plus_Jakarta_Sans } from 'next/font/google';
 import type { ReactNode } from 'react';
 import { Providers } from '@/components/Providers';
 import { Shell } from '@/components/Shell';
@@ -8,6 +8,8 @@ import './globals.css';
 
 /** Self-hosted at build time by next/font (no request to Google from the visitor's browser). */
 const sans = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-sans' });
+/** Headings. */
+const display = Outfit({ subsets: ['latin'], display: 'swap', variable: '--font-display', weight: ['600', '700', '800'] });
 
 const siteUrl = env.siteUrl;
 
@@ -36,7 +38,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#050505',
+  themeColor: '#07060B',
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
@@ -44,7 +46,16 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={sans.variable}>
+    <html lang="en" className={`${sans.variable} ${display.variable}`}>
+      <head>
+        {/* Open the connections to the music servers while the page is still loading, so the
+            first search answers and the first song starts sooner. */}
+        <link rel="preconnect" href="https://api.audius.co" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://api.audius.co" />
+        <link rel="preconnect" href="https://creatornode.audius.co" />
+        <link rel="dns-prefetch" href="https://archive.org" />
+        <link rel="dns-prefetch" href="https://de1.api.radio-browser.info" />
+      </head>
       <body className="font-sans antialiased">
         <Providers>
           <Shell>{children}</Shell>

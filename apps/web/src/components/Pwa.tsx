@@ -49,6 +49,9 @@ export function usePwaInstall() {
   return { canInstall, isInstalled, install };
 }
 
+/** Set when the listener presses Update on the "new version" notice. */
+let updateRequested = false;
+
 /** Registers the service worker (production builds only) and announces updates. */
 export function PwaManager() {
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
@@ -56,8 +59,10 @@ export function PwaManager() {
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production' || !('serviceWorker' in navigator)) return;
     let reloaded = false;
+    // Reload only after the listener pressed Update. On a first visit the new service worker also
+    // takes control of the page; reloading then would cut off the song that just started playing.
     const onControllerChange = () => {
-      if (reloaded) return;
+      if (reloaded || !updateRequested) return;
       reloaded = true;
       window.location.reload();
     };
@@ -87,7 +92,14 @@ export function PwaManager() {
     <div className="fixed inset-x-0 top-3 z-[80] flex justify-center px-4" role="alert">
       <div className="flex items-center gap-3 rounded-full bg-coal px-4 py-2 text-sm text-white shadow-lg ring-1 ring-gold/50">
         <span>A new version of SAHU MUSIC is available.</span>
-        <button type="button" className="font-bold text-gold hover:text-gold-soft" onClick={() => waiting.postMessage({ type: 'SKIP_WAITING' })}>
+        <button
+          type="button"
+          className="font-bold text-gold hover:text-gold-soft"
+          onClick={() => {
+            updateRequested = true;
+            waiting.postMessage({ type: 'SKIP_WAITING' });
+          }}
+        >
           Update
         </button>
         <button type="button" className="text-muted hover:text-white" onClick={() => setWaiting(null)} aria-label="Dismiss update notice">

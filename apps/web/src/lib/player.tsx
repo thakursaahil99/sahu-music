@@ -40,11 +40,24 @@ interface PlayerValue {
   jumpTo(i: number): void;
   removeFromQueue(i: number): void;
   clearQueue(): void;
+  /**
+   * Prepare a song the listener will probably play: `intent` (pointer resting on it, finger down)
+   * buffers it; `likely` (top search result, the #1 hit) only opens it, which costs ~100 KB.
+   */
+  warm(t: Track, how?: 'intent' | 'likely'): void;
 }
 
 interface Progress {
   position: number;
   duration: number;
+}
+
+/** A random queue position other than the current one. */
+function shufflePick(length: number, current: number): number {
+  let n: number;
+  do n = Math.floor(Math.random() * length);
+  while (n === current);
+  return n;
 }
 
 const PlayerCtx = createContext<PlayerValue | null>(null);
@@ -94,6 +107,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   addHistoryRef.current = addHistory;
 
   const engineFor = (t: Track): Engine | null => (t.video ? ytRef.current : audioRef.current);
+  /** With shuffle on, the next pick is made early so that it can be buffered. */
+  const upcomingRef = useRef<{ from: number; to: number } | null>(null);
 
   const startAt = useCallback(
     (q: Track[], i: number, autoplay = true) => {
@@ -131,9 +146,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         return;
       }
       let ni: number;
-      if (sh && q.length > 1) {
-        do ni = Math.floor(Math.random() * q.length);
-        while (ni === i);
+      const planned = upcomingRef.current;
+      upcomingRef.current = null;
+      if (sh && q.length > 1 && planned && planned.from === i && planned.to < q.length) {
+        ni = planned.to; // the shuffle pick that was already buffered
+      } else if (sh && q.length > 1) {
+        ni = shufflePick(q.length, i);
       } else {
         ni = i + 1;
       }
@@ -239,6 +257,40 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const current = index >= 0 ? queue[index] ?? null : null;
+
+  /** Buffering ahead costs data: not with Data saver on, nor when the browser asks to save data. */
+  const mayPreload = useCallback((): boolean => {
+    if (settings.dataSaver) return false;
+    const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+    return !conn?.saveData && !/(^|-)2g$/.test(conn?.effectiveType ?? '');
+  }, [settings.dataSaver]);
+
+  // Once a song is playing, buffer the one after it so that Next and the automatic move are instant.
+  useEffect(() => {
+    if (!isPlaying || index < 0 || queue.length < 2 || !mayPreload()) return;
+    const timer = setTimeout(() => {
+      let ni = index + 1;
+      if (shuffle) {
+        const planned = upcomingRef.current;
+        ni = planned && planned.from === index && planned.to < queue.length ? planned.to : shufflePick(queue.length, index);
+        upcomingRef.current = { from: index, to: ni };
+      } else if (ni >= queue.length) {
+        if (repeat !== 'all') return;
+        ni = 0;
+      }
+      const t = queue[ni];
+      if (t && !t.video && music.isTrackPlayable(t)) audioRef.current?.preload(t, 'next');
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [isPlaying, index, queue, shuffle, repeat, mayPreload]);
+
+  const warm = useCallback(
+    (t: Track, how: 'intent' | 'likely' = 'intent') => {
+      if (t.video || t.live || !mayPreload() || !music.isTrackPlayable(t)) return;
+      audioRef.current?.preload(t, how);
+    },
+    [mayPreload],
+  );
 
   // Persist queue (metadata only – audio is never stored).
   useEffect(() => {
@@ -412,10 +464,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const value = useMemo<PlayerValue>(
     () => ({
       queue, index, current, isPlaying, isLoading, shuffle, repeat, volume, error, fullOpen, setFullOpen, videoSlot, setVideoSlot,
-      playQueue, toggle, next, prev, seek, toggleShuffle, cycleRepeat, setVolume, addToQueue, playNext, jumpTo, removeFromQueue, clearQueue,
+      playQueue, toggle, next, prev, seek, toggleShuffle, cycleRepeat, setVolume, addToQueue, playNext, jumpTo, removeFromQueue, clearQueue, warm,
     }),
     [queue, index, current, isPlaying, isLoading, shuffle, repeat, volume, error, fullOpen, videoSlot,
-      playQueue, toggle, next, prev, seek, toggleShuffle, cycleRepeat, setVolume, addToQueue, playNext, jumpTo, removeFromQueue, clearQueue],
+      playQueue, toggle, next, prev, seek, toggleShuffle, cycleRepeat, setVolume, addToQueue, playNext, jumpTo, removeFromQueue, clearQueue, warm],
   );
 
   return (

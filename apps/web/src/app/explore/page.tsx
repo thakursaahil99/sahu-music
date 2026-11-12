@@ -2,11 +2,10 @@
 
 import { useState } from 'react';
 import { trackKey, type Track } from '@sahu/models';
-import { CATEGORIES } from '@sahu/shared';
 import { AdSlot } from '@/components/AdSlot';
 import { Icon } from '@/components/icons';
 import { LoadMore, TrackList } from '@/components/tracks';
-import { CardSkeletonRow, CategoryTile, CollectionCard, EmptyState, ErrorState, ListSkeleton, Row, Section } from '@/components/ui';
+import { CardSkeletonRow, CategoryTile, CollectionCard, EmptyState, ErrorState, ListSkeleton, PageHeader, Row, Section, Segmented } from '@/components/ui';
 import { useAsync, usePaged } from '@/lib/hooks';
 import { music, visibleCategories } from '@/lib/music';
 import { usePlayer } from '@/lib/player';
@@ -33,10 +32,10 @@ export default function ExplorePage() {
 
   return (
     <>
-      <h1 className="mb-6 text-3xl font-extrabold text-white">Explore</h1>
+      <PageHeader icon="compass" eyebrow="Discover" title="Explore" subtitle="Categories, live charts and playlists from every source" />
 
       <Section title="Categories">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="stagger grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {visibleCategories.map((c) => <CategoryTile key={c.slug} category={c} />)}
         </div>
       </Section>
@@ -52,12 +51,8 @@ export default function ExplorePage() {
             </button>
           ))}
         </div>
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          {TIMES.map((t) => (
-            <button key={t.id} type="button" onClick={() => setTime(t.id)} aria-pressed={time === t.id} className={`chip !py-1 text-xs ${time === t.id ? 'chip-active' : ''}`}>
-              {t.label}
-            </button>
-          ))}
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <Segmented label="Chart period" items={TIMES} value={time} onChange={setTime} />
           <button type="button" className="btn-gold ml-auto !py-2" disabled={chart.items.length === 0} onClick={() => playQueue(chart.items, 0)}>
             <Icon name="play" size={16} /> Play all
           </button>
@@ -70,7 +65,9 @@ export default function ExplorePage() {
           <EmptyState title="Nothing here yet" text="The providers have no playable tracks for this genre and period. Try another period." />
         ) : (
           <>
-            <TrackList tracks={chart.items} />
+            <div className="panel p-2 md:p-3">
+              <TrackList tracks={chart.items} />
+            </div>
             <LoadMore hasMore={chart.hasMore} loading={chart.loadingMore} onClick={chart.loadMore} />
           </>
         )}

@@ -21,7 +21,8 @@
     "test:playback": "node scripts/full-length-test.mjs",
     "apk": "node scripts/build-apk.mjs",
     "test:e2e": "node scripts/e2e-playback.mjs",
-    "youtube": "node scripts/setup-youtube.mjs"
+    "youtube": "node scripts/setup-youtube.mjs",
+    "admin": "node scripts/create-admin.mjs"
   },
   "devDependencies": {
     "sharp": "^0.33.5",

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { providerName, trackKey, type Track } from '@sahu/models';
 import { formatDuration } from '@sahu/shared';
 import { useLibrary } from '@/lib/library';
@@ -64,10 +64,31 @@ function Equalizer({ dark = false }: { dark?: boolean }) {
   return (
     <span className="flex h-4 items-end gap-0.5" aria-label="Now playing">
       {[0, 0.2, 0.4].map((d) => (
-        <span key={d} className={`w-1 origin-bottom animate-eq rounded-sm ${dark ? 'bg-ink' : 'bg-gold'}`} style={{ height: '100%', animationDelay: `${d}s` }} />
+        <span key={d} className={`w-1 origin-bottom animate-eq rounded-sm ${dark ? 'bg-ink' : 'bg-dyn'}`} style={{ height: '100%', animationDelay: `${d}s` }} />
       ))}
     </span>
   );
+}
+
+/**
+ * Pointer resting on a song (mouse), a finger touching it, or keyboard focus: the listener is
+ * about to play it, so the player starts buffering it already. Playing then starts at once.
+ */
+export function useWarm(track: Track | null | undefined) {
+  const { warm } = usePlayer();
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const go = () => track && warm(track);
+  return {
+    onPointerEnter: (e: React.PointerEvent) => {
+      if (e.pointerType !== 'mouse') return;
+      clearTimeout(timer.current);
+      timer.current = setTimeout(go, 180);
+    },
+    onPointerLeave: () => clearTimeout(timer.current),
+    onPointerDown: go,
+    onFocus: go,
+  };
 }
 
 export function FavoriteButton({ track, size = 20 }: { track: Track; size?: number }) {
@@ -82,43 +103,53 @@ export function FavoriteButton({ track, size = 20 }: { track: Track; size?: numb
       }}
       aria-label={fav ? 'Remove from favourites' : 'Add to favourites'}
       aria-pressed={fav}
-      className={`icon-btn ${fav ? 'text-gold' : 'text-muted hover:text-white'}`}
+      className={`icon-btn ${fav ? 'text-rose' : 'text-white/55 hover:text-white'}`}
     >
       <Icon name={fav ? 'heartFill' : 'heart'} size={size} />
     </button>
   );
 }
 
-/** Square card used in horizontal rows. */
+/** Square card used in horizontal rows. The whole cover plays the song. */
 export function TrackCard({ track, list, index }: { track: Track; list: Track[]; index: number }) {
   const { current, isPlaying, playQueue, toggle } = usePlayer();
+  const intent = useWarm(track);
   const active = !!current && trackKey(current) === trackKey(track);
   const unavailable = !music.isTrackPlayable(track);
   return (
-    <div className={`surface surface-hover card-lift group w-44 shrink-0 snap-start rounded-2xl p-3 md:w-48 ${active ? '!ring-gold/40' : ''} ${unavailable ? 'opacity-50' : ''}`}>
+    <div {...intent} className={`card-lift group w-[9.25rem] shrink-0 snap-start xs:w-40 md:w-44 lg:w-48 ${unavailable ? 'opacity-50' : ''}`}>
       <div className="relative">
-        <Artwork src={track.artwork} alt={`${track.title} artwork`} rounded="rounded-xl" className="art-zoom ring-1 ring-white/5" />
+        <Artwork src={track.artwork} alt={`${track.title} artwork`} rounded="rounded-2xl" className={`art-zoom shadow-lift ${active ? 'ring-2 ring-dyn' : 'ring-1 ring-white/[0.06]'}`} />
         <button
           type="button"
           onClick={() => (active ? toggle() : playQueue(list, index))}
           aria-label={active && isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
-          className={`absolute bottom-2 right-2 flex h-11 w-11 items-center justify-center rounded-full bg-gold text-ink shadow-glow transition duration-300 hover:scale-110 active:scale-95 focus-visible:translate-y-0 focus-visible:opacity-100 ${
-            active ? `opacity-100 ${isPlaying ? 'animate-pulse-ring' : ''}` : 'opacity-100 md:translate-y-2 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100'
-          }`}
+          className="absolute inset-0 rounded-2xl"
         >
-          <Icon name={active && isPlaying ? 'pause' : 'play'} size={20} />
+          <span
+            className={`absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-white text-ink shadow-lift transition duration-300 group-hover:scale-105 ${
+              active ? 'opacity-100' : '[@media(hover:hover)]:translate-y-1.5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:translate-y-0 [@media(hover:hover)]:group-hover:opacity-100 group-focus-within:opacity-100'
+            }`}
+          >
+            <Icon name={active && isPlaying ? 'pause' : 'play'} size={18} />
+          </span>
         </button>
+        {active && isPlaying && (
+          <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-1.5 backdrop-blur" aria-hidden="true">
+            <Equalizer />
+          </span>
+        )}
         <SourceBadge track={track} overlay />
       </div>
-      <p className={`mt-3 truncate text-sm font-semibold ${active ? 'text-gold' : 'text-white'}`} title={track.title}>
+      <p className={`mt-2.5 truncate text-[13.5px] font-semibold ${active ? 'text-dyn' : 'text-white'}`} title={track.title}>
         {track.title}
       </p>
       {track.artistId ? (
-        <Link href={`/artist?p=${track.provider}&id=${track.artistId}`} className="block truncate text-xs text-muted hover:text-white">
+        <Link href={`/artist?p=${track.provider}&id=${track.artistId}`} className="block truncate text-xs text-white/55 hover:text-white">
           {track.artist}
         </Link>
       ) : (
-        <p className="truncate text-xs text-muted">{track.artist}</p>
+        <p className="truncate text-xs text-white/55">{track.artist}</p>
       )}
     </div>
   );
@@ -127,21 +158,23 @@ export function TrackCard({ track, list, index }: { track: Track; list: Track[];
 /** Compact horizontal tile (artwork + title) for "jump back in" grids. */
 export function QuickTile({ track, list, index }: { track: Track; list: Track[]; index: number }) {
   const { current, isPlaying, playQueue, toggle } = usePlayer();
+  const intent = useWarm(track);
   const active = !!current && trackKey(current) === trackKey(track);
   const unavailable = !music.isTrackPlayable(track);
   return (
     <button
       type="button"
+      {...intent}
       onClick={() => (active ? toggle() : playQueue(list, index))}
       aria-label={active && isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
-      className={`surface surface-hover group flex items-center gap-3 overflow-hidden rounded-xl pr-3 text-left ${active ? '!ring-gold/40' : ''} ${unavailable ? 'opacity-50' : ''}`}
+      className={`surface surface-hover group flex items-center gap-3 overflow-hidden rounded-2xl p-1.5 pr-3 text-left ${active ? '!bg-white/[0.08] !ring-dyn/50' : ''} ${unavailable ? 'opacity-50' : ''}`}
     >
-      <Artwork src={track.artwork} alt="" size="sm" rounded="rounded-none" className="h-14 w-14 shrink-0 md:h-16 md:w-16" />
+      <Artwork src={track.artwork} alt="" size="sm" rounded="rounded-xl" className="h-12 w-12 shrink-0 md:h-14 md:w-14" />
       <span className="min-w-0 flex-1">
-        <span className={`block truncate text-sm font-semibold ${active ? 'text-gold' : 'text-white'}`}>{track.title}</span>
-        <span className="block truncate text-xs text-muted">{track.artist}</span>
+        <span className={`block truncate text-sm font-semibold ${active ? 'text-dyn' : 'text-white'}`}>{track.title}</span>
+        <span className="block truncate text-xs text-white/55">{track.artist}</span>
       </span>
-      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold text-ink shadow-glow transition duration-300 ${active ? 'opacity-100' : 'scale-90 opacity-0 group-hover:scale-100 group-hover:opacity-100 group-focus-visible:opacity-100'}`}>
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-ink transition duration-300 ${active ? 'opacity-100' : 'scale-90 opacity-0 group-hover:scale-100 group-hover:opacity-100 group-focus-visible:opacity-100'}`}>
         {active && isPlaying ? <Equalizer dark /> : <Icon name="play" size={16} />}
       </span>
     </button>
@@ -165,37 +198,39 @@ export function TrackRow({
   onPlay?: () => void;
 }) {
   const { current, isPlaying, playQueue, toggle } = usePlayer();
+  const intent = useWarm(track);
   const [menu, setMenu] = useState(false);
   const active = !!current && trackKey(current) === trackKey(track);
   const play = () => (onPlay ? onPlay() : active ? toggle() : playQueue(list, index));
   const unavailable = !music.isTrackPlayable(track);
 
   return (
-    <div className={`group flex items-center gap-3 rounded-xl px-2 py-2 transition duration-200 hover:bg-white/[0.06] ${active ? 'bg-gradient-to-r from-gold/15 to-transparent ring-1 ring-gold/20' : ''} ${unavailable ? 'opacity-60' : ''}`}>
+    <div {...intent} className={`group relative flex items-center gap-3 rounded-2xl px-2 py-1.5 transition duration-200 hover:bg-white/[0.05] ${active ? 'bg-white/[0.06]' : ''} ${unavailable ? 'opacity-60' : ''}`}>
+      {active && <span className="absolute left-0 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-full bg-dyn shadow-glow" aria-hidden="true" />}
       {showIndex && (
-        <span className="hidden w-6 shrink-0 justify-center text-sm tabular-nums text-muted sm:flex">
+        <span className="hidden w-6 shrink-0 justify-center text-sm font-semibold tabular-nums text-white/40 sm:flex">
           {active && isPlaying ? <Equalizer /> : index + 1}
         </span>
       )}
       <button type="button" onClick={play} className="relative shrink-0" aria-label={active && isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}>
-        <Artwork src={track.artwork} alt="" size="sm" rounded="rounded-md" className="h-12 w-12" />
-        <span className="absolute inset-0 flex items-center justify-center rounded-md bg-black/50 text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100">
+        <Artwork src={track.artwork} alt="" size="sm" rounded="rounded-xl" className="h-12 w-12" />
+        <span className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/50 text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100">
           <Icon name={active && isPlaying ? 'pause' : 'play'} size={18} />
         </span>
       </button>
       <div className="min-w-0 flex-1">
         <span className="flex min-w-0 items-center gap-2">
-          <button type="button" onClick={play} className={`block min-w-0 truncate text-left text-sm font-medium ${active ? 'text-gold' : 'text-white'}`}>
+          <button type="button" onClick={play} className={`block min-w-0 truncate text-left text-sm font-semibold ${active ? 'text-dyn' : 'text-white'}`}>
             {track.title}
           </button>
           <SourceBadge track={track} />
         </span>
         {track.artistId ? (
-          <Link href={`/artist?p=${track.provider}&id=${track.artistId}`} className="block truncate text-xs text-muted hover:text-white">
+          <Link href={`/artist?p=${track.provider}&id=${track.artistId}`} className="block truncate text-xs text-white/55 hover:text-white">
             {track.artist}
           </Link>
         ) : (
-          <p className="truncate text-xs text-muted">{track.artist}</p>
+          <p className="truncate text-xs text-white/55">{track.artist}</p>
         )}
       </div>
       {/* no album/genre column in compact lists (the queue panel) so the title keeps its room */}
@@ -204,7 +239,8 @@ export function TrackRow({
           {track.album ? `${track.album}${track.year ? ` · ${track.year}` : ''}` : track.genre}
         </span>
       )}
-      <span className="hidden w-12 text-right text-xs tabular-nums text-muted sm:block">{unavailable ? '—' : track.live ? '' : formatDuration(track.duration)}</span>
+      {/* compact lists (the queue) leave the room to the title */}
+      <span className={`hidden w-12 text-right text-xs tabular-nums text-white/45 ${showIndex ? 'sm:block' : ''}`}>{unavailable ? '—' : track.live ? '' : formatDuration(track.duration)}</span>
       <FavoriteButton track={track} size={18} />
       {onRemove && (
         <button type="button" onClick={onRemove} className="icon-btn text-muted hover:text-red-400" aria-label={`Remove ${track.title}`}>
@@ -267,12 +303,13 @@ export function TrackMenu({ track, onClose }: { track: Track; onClose: () => voi
     onClose();
   };
 
-  const item = 'flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm text-white hover:bg-coal-light';
+  const item = 'flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-white hover:bg-white/[0.07]';
   const perm = (p: string) => (p === 'allowed' ? 'Allowed' : p === 'not_allowed' ? 'Not allowed' : 'Unconfirmed');
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label={`Options for ${track.title}`}>
-      <div className="max-h-[80dvh] w-full max-w-md animate-slide-up overflow-y-auto rounded-t-2xl bg-coal p-3 ring-1 ring-white/10 sm:animate-fade-in sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[60] flex animate-fade-in items-end justify-center bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label={`Options for ${track.title}`}>
+      <div className="max-h-[80dvh] w-full max-w-md animate-slide-up overflow-y-auto rounded-t-3xl bg-coal p-3 pb-[max(env(safe-area-inset-bottom),12px)] ring-1 ring-white/10 sm:animate-pop-in sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+        <span className="mx-auto mb-2 block h-1 w-10 rounded-full bg-white/20 sm:hidden" aria-hidden="true" />
         <div className="mb-2 flex items-center gap-3 border-b border-coal-line p-2 pb-3">
           <Artwork src={track.artwork} alt="" size="sm" rounded="rounded-md" className="h-12 w-12" />
           <div className="min-w-0 flex-1">

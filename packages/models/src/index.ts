@@ -103,6 +103,8 @@ export interface Collection {
 export interface PageOpts {
   limit?: number;
   offset?: number;
+  /** Ask only for the most played results (providers that can sort by plays; others ignore it). */
+  sort?: 'popular';
 }
 
 /** A playlist owned by a SAHU MUSIC user (local guest storage or Supabase). */

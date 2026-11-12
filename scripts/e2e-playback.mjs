@@ -163,16 +163,21 @@ try {
   await cdp('Page.enable');
   await cdp('Runtime.enable');
   if (process.env.E2E_YOUTUBE) await cdp('Fetch.enable', { patterns: [{ urlPattern: '*googleapis.com/youtube/v3/*', requestStage: 'Request' }] });
-  // Keep a handle on the app's own audio element (it is created with `new Audio()`).
+  // Keep a handle on the app's audio element that is playing. The player creates a few with
+  // `new Audio()` (spares buffer the next song) and marks the active one with data-sahu-active.
   await cdp('Page.addScriptToEvaluateOnNewDocument', {
-    source: 'const A = window.Audio; window.Audio = function (...a) { const el = new A(...a); window.__audio = el; return el; }; window.Audio.prototype = A.prototype;',
+    source: `const A = window.Audio; const all = []; window.Audio = function (...a) { const el = new A(...a); all.push(el); return el; }; window.Audio.prototype = A.prototype;
+      Object.defineProperty(window, '__audio', { get: () => all.find((e) => e.dataset.sahuActive === '1') || all[0] });`,
   });
 
   await cdp('Page.navigate', { url: `${site}/` });
   const cardBtn = 'document.querySelectorAll(\'button[aria-label^="Play "]\')';
 
   await check('home page loads real tracks', async () => {
-    const n = await waitFor(`${cardBtn}.length`, 'track cards on the home page', 45000);
+    // The radio row can load before the songs. Wait for the Hindi hits themselves, so the first
+    // card clicked below is a song (with a length) and not a live station.
+    await waitFor('[...document.querySelectorAll("button")].some((b) => b.textContent.includes("Play Hindi hits") && !b.disabled)', 'Hindi hits on the home page', 45000);
+    const n = await js(`${cardBtn}.length`);
     await sleep(1500);
     await shot('01-home-desktop');
     return `${n} playable cards`;

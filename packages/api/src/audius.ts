@@ -15,6 +15,9 @@ export const AUDIUS_GENRES = [
 
 const idOk = (id: string) => /^[A-Za-z0-9]{1,32}$/.test(id);
 
+/** How long a search waits for its second ordering after the first one has arrived. */
+const SECOND_ORDER_GRACE_MS = 700;
+
 export interface AudiusOptions {
   appName?: string;
   baseUrl?: string;
@@ -54,6 +57,10 @@ export class AudiusProvider implements MusicProvider {
     const json = await fetchJson<{ data?: unknown }>(this.url(path, params), {
       provider: this.id,
       limiter: this.limiter,
+      // Audius answers in about a second; a request that hangs is retried once instead of
+      // being waited on for the default 12 s (twice).
+      timeoutMs: 6_000,
+      retries: 1,
     });
     return json?.data ?? null;
   }
@@ -145,14 +152,20 @@ export class AudiusProvider implements MusicProvider {
    */
   async searchTracks(query: string, page: PageOpts = {}): Promise<Track[]> {
     const params = { query, limit: page.limit ?? 20, offset: page.offset ?? 0 };
+    if (page.sort === 'popular') return this.tracks(await this.get('/tracks/search', { ...params, sort_method: 'popular' }));
     if (params.offset > 0) return this.tracks(await this.get('/tracks/search', params));
-    const [relevant, popular] = await Promise.allSettled([
-      this.get('/tracks/search', params),
-      this.get('/tracks/search', { ...params, sort_method: 'popular' }),
-    ]);
-    if (relevant.status === 'rejected' && popular.status === 'rejected') throw relevant.reason;
+    const asks = [this.get('/tracks/search', params), this.get('/tracks/search', { ...params, sort_method: 'popular' })];
+    const answers: (PromiseSettledResult<any> | undefined)[] = [undefined, undefined];
+    const all = Promise.all(asks.map((a, i) => a.then((value) => (answers[i] = { status: 'fulfilled', value }), (reason) => (answers[i] = { status: 'rejected', reason }))));
+    // Once one ordering is in, the other gets SECOND_ORDER_GRACE_MS more; a slow one keeps running
+    // (and fills the cache) but does not hold the results back.
+    const firstIn = Promise.race(asks.map((a) => a.then(() => undefined, () => undefined)));
+    await Promise.race([all, firstIn.then(() => new Promise((r) => setTimeout(r, SECOND_ORDER_GRACE_MS)))]);
+    if (!answers.some((a) => a?.status === 'fulfilled')) await all; // nothing usable yet: wait for both
+    const [relevant, popular] = answers;
+    if (relevant?.status !== 'fulfilled' && popular?.status !== 'fulfilled') throw relevant?.status === 'rejected' ? relevant.reason : (popular as PromiseRejectedResult).reason;
     const seen = new Set<string>();
-    return [...(relevant.status === 'fulfilled' ? this.tracks(relevant.value) : []), ...(popular.status === 'fulfilled' ? this.tracks(popular.value) : [])].filter(
+    return [...(relevant?.status === 'fulfilled' ? this.tracks(relevant.value) : []), ...(popular?.status === 'fulfilled' ? this.tracks(popular.value) : [])].filter(
       (t) => !seen.has(t.providerTrackId) && !!seen.add(t.providerTrackId),
     );
   }

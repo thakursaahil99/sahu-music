@@ -29,6 +29,9 @@ export interface MusicProvider {
   /**
    * Longest time (ms) the app waits for this provider before showing the other providers'
    * results. The request keeps running and its (cached) answer is used next time.
+   * Setting it also marks the provider as a supplementary source: early search results are
+   * shown once a main source has answered, and while the listener is still typing it is asked
+   * only after a short pause.
    */
   readonly answerWithinMs?: number;
 

@@ -25,6 +25,8 @@ export class RadioProvider implements MusicProvider {
   readonly id = 'radio' as const;
   readonly name = 'Live radio (Radio Browser)';
   readonly homepage = 'https://www.radio-browser.info';
+  /** Stations are an extra in search results: the songs never wait longer than this for them. */
+  readonly answerWithinMs = 2_500;
   private readonly limiter = new RateLimiter(10, 5_000);
 
   constructor(private readonly enabled = true) {}

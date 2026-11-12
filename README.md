@@ -76,7 +76,13 @@ Never put the Supabase `service_role` key in any app. Both web apps refuse to st
 1. Create a project at supabase.com.
 2. In the SQL editor run the files in `supabase/migrations` in order (`…0001_schema.sql` → `…0004_…`).
 3. Put the project URL and anon key in the `.env.local` files.
-4. Sign up in the website, then make yourself an admin (SQL editor):
+4. Create the main admin account. With the `service_role` key set for the current terminal only (`SUPABASE_SERVICE_ROLE_KEY`):
+
+   ```bash
+   npm run admin -- you@example.com YourPassword
+   ```
+
+   This creates the account (or resets its password) and grants the admin role. Alternatively sign up in the website and promote the account in the SQL editor:
 
    ```sql
    update public.profiles set role = 'admin'

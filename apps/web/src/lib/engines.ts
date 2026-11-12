@@ -37,29 +37,105 @@ export interface Engine {
 }
 
 // ── <audio> ──────────────────────────────────────────────────────────
+/**
+ * Why a track is being prepared ahead of time. Each reason has its own element.
+ *  - next:   the song after the current one        → buffered (instant Next / automatic move)
+ *  - intent: pointer resting on it, finger down     → buffered
+ *  - likely: the top search result, the #1 hit      → only opened (~100 KB): the slow part of
+ *            starting a song is the servers finding the file, and that is then already done
+ */
+export type PreloadSlot = 'next' | 'intent' | 'likely';
+
+/**
+ * iPhone/iPad only start an <audio> element from a tap on that element, so a second element
+ * could not take over when a song ends in the background. There, one element is used.
+ */
+function canSwapElements(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const iOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  return !iOS;
+}
+
 export class AudioEngine implements Engine {
-  readonly el: HTMLAudioElement;
+  /** The element that is playing (or about to). Marked with `data-sahu-active` for tests. */
+  el: HTMLAudioElement;
   private key: string | null = null;
+  private volume = 1;
+  /**
+   * Silent elements that already buffer a track that is likely to be played: the next one in
+   * the queue, and the one the listener is pointing at. Starting one of them is instant
+   * (Audius needs 1–2 s to find a new song's file; that wait happens before the tap).
+   */
+  private readonly spares = new Map<PreloadSlot, { el: HTMLAudioElement; key: string | null }>();
 
   constructor(private readonly on: EngineEvents) {
-    this.el = new Audio();
-    this.el.preload = 'metadata';
-    const el = this.el;
-    el.addEventListener('play', () => on.play());
-    el.addEventListener('pause', () => on.pause());
-    el.addEventListener('waiting', () => on.waiting());
-    el.addEventListener('playing', () => on.playing());
-    const t = () => on.time(el.currentTime, Number.isFinite(el.duration) ? el.duration : 0);
+    this.el = this.make();
+    this.el.dataset.sahuActive = '1';
+    if (canSwapElements()) {
+      this.spares.set('next', { el: this.make(), key: null });
+      this.spares.set('intent', { el: this.make(), key: null });
+      this.spares.set('likely', { el: this.make(), key: null });
+    }
+  }
+
+  private make(): HTMLAudioElement {
+    const el = new Audio();
+    el.preload = 'metadata';
+    const mine = () => el === this.el;
+    const on = this.on;
+    el.addEventListener('play', () => mine() && on.play());
+    el.addEventListener('pause', () => mine() && on.pause());
+    el.addEventListener('waiting', () => mine() && on.waiting());
+    el.addEventListener('playing', () => mine() && on.playing());
+    const t = () => mine() && on.time(el.currentTime, Number.isFinite(el.duration) ? el.duration : 0);
     el.addEventListener('timeupdate', t);
     el.addEventListener('durationchange', t);
-    el.addEventListener('ended', () => on.ended());
+    el.addEventListener('ended', () => mine() && on.ended());
     el.addEventListener('error', () => {
-      if (el.getAttribute('src')) on.error(null, false);
+      if (mine()) {
+        if (el.getAttribute('src')) on.error(null, false);
+        return;
+      }
+      // a spare that failed simply stops being a shortcut
+      for (const s of this.spares.values()) if (s.el === el) s.key = null;
     });
+    return el;
+  }
+
+  /** Start buffering `track` silently so that playing it later starts at once. */
+  preload(track: Track, slot: PreloadSlot): void {
+    const spare = this.spares.get(slot);
+    if (!spare || !track.streamUrl || track.live || track.video) return;
+    const key = trackKey(track);
+    if (key === this.key || [...this.spares.values()].some((s) => s.key === key)) return;
+    spare.key = key;
+    spare.el.preload = slot === 'likely' ? 'metadata' : 'auto';
+    spare.el.src = track.streamUrl;
   }
 
   load(track: Track, autoplay: boolean): void {
-    this.key = trackKey(track);
+    const key = trackKey(track);
+    const ready = [...this.spares.values()].find((s) => s.key === key && !s.el.error);
+    if (ready) {
+      // The buffered element takes over; the old one becomes the empty spare.
+      const old = this.el;
+      this.el = ready.el;
+      ready.el = old;
+      ready.key = null;
+      delete old.dataset.sahuActive;
+      this.el.dataset.sahuActive = '1';
+      old.pause();
+      old.removeAttribute('src');
+      old.load();
+      old.preload = 'metadata';
+      this.el.volume = this.volume;
+      this.el.currentTime = 0;
+      this.key = key;
+      this.on.time(0, this.duration());
+      if (autoplay) this.play();
+      return;
+    }
+    this.key = key;
     this.el.src = track.streamUrl;
     if (autoplay) this.play();
   }
@@ -89,6 +165,7 @@ export class AudioEngine implements Engine {
     return !!this.el.error;
   }
   setVolume(v: number): void {
+    this.volume = v;
     this.el.volume = v;
   }
   stop(): void {

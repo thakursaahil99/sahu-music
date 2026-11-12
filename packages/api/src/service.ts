@@ -6,7 +6,7 @@ import { ItunesProvider } from './itunes';
 import { JamendoProvider } from './jamendo';
 import type { MusicProvider, TrendingOpts } from './provider';
 import { RadioProvider } from './radio';
-import { hindiFirst, rankSearch } from './rank';
+import { hindiFirst, normalizeText, rankSearch, scoreSearch } from './rank';
 import { filterPlayable, unavailableReason } from './rights';
 import { YoutubeProvider } from './youtube';
 
@@ -25,7 +25,28 @@ export interface SearchOpts {
   userSearch?: boolean;
   /** Leave these providers out (e.g. slow ones for background rows). */
   exclude?: ProviderId[];
+  /**
+   * Called with the ranked results so far each time a provider answers before the last one,
+   * so the fast providers' songs are on screen without waiting for the slow ones.
+   */
+  onPartial?: (tracks: Track[]) => void;
+  /**
+   * Abort when a newer search replaces this one (the listener kept typing). Slow providers are
+   * then asked only after a short pause, so half-typed words do not use up their request limits.
+   */
+  signal?: AbortSignal;
 }
+
+interface FanOutOpts<T> {
+  pick?: (p: MusicProvider) => boolean;
+  onPartial?: (items: T[]) => void;
+  signal?: AbortSignal;
+}
+
+/** How long a cancellable search waits before asking a slow provider (one with `answerWithinMs`). */
+const SLOW_PROVIDER_DELAY_MS = 450;
+/** How many already-seen tracks are kept for instant search matches. */
+const SEEN_MAX = 800;
 
 /** Per-query fetch size for year-filtered categories (most results fall outside the era). */
 const ERA_FETCH = 50;
@@ -139,13 +160,39 @@ export class MusicService {
   }
 
   /** Query all active providers; interleave results; demo fallback if every provider failed. */
-  private async fanOut<T>(fn: (p: MusicProvider) => Promise<T[]>, pick: (p: MusicProvider) => boolean = () => true): Promise<T[]> {
+  private async fanOut<T>(fn: (p: MusicProvider) => Promise<T[]>, opts: FanOutOpts<T> = {}): Promise<T[]> {
+    const { pick = () => true, onPartial, signal } = opts;
     const active = this.cfg.forceDemo ? [] : this.active().filter(pick);
     if (active.length === 0) {
       this.setDemo(true);
       return fn(this.demo);
     }
-    const settled = await Promise.allSettled(active.map((p) => withinBudget(fn(p), p.answerWithinMs)));
+    const answers: (T[] | undefined)[] = active.map(() => undefined);
+    let waiting = active.length;
+    // Supplementary sources (radio, Internet Archive) declare an answer budget; the others are main sources.
+    let mainAnswered = active.every((p) => !!p.answerWithinMs);
+    const ask = async (p: MusicProvider, i: number): Promise<T[]> => {
+      const supplementary = !!p.answerWithinMs;
+      const paused = !!signal && supplementary;
+      const work = paused ? sleep(SLOW_PROVIDER_DELAY_MS).then(() => (signal?.aborted ? [] : fn(p))) : fn(p);
+      try {
+        const list = await withinBudget(work, p.answerWithinMs && p.answerWithinMs + (paused ? SLOW_PROVIDER_DELAY_MS : 0));
+        answers[i] = list;
+        return list;
+      } finally {
+        waiting -= 1;
+        if (!supplementary) mainAnswered = true;
+        // Early results go out as soon as the first main source has answered (one slow or stuck
+        // source never holds the songs back, and a lone radio station never comes first), and
+        // again each time another source adds something.
+        const added = !supplementary || (answers[i]?.length ?? 0) > 0;
+        if (onPartial && waiting > 0 && mainAnswered && added && !signal?.aborted) {
+          const lists = answers.filter((l): l is T[] => !!l);
+          if (lists.some((l) => l.length > 0)) onPartial(interleave(lists));
+        }
+      }
+    };
+    const settled = await Promise.allSettled(active.map(ask));
     const ok = settled.filter((s): s is PromiseFulfilledResult<T[]> => s.status === 'fulfilled').map((s) => s.value);
     // Some sources answer [] without asking anyone (radio has no chart). So: demo mode when
     // nothing came back at all and at least one source actually failed.
@@ -169,13 +216,54 @@ export class MusicService {
   }
 
   private playable(tracks: Track[]): Track[] {
-    return filterPlayable(tracks, this.blocklist, { allowPreviews: this.previewsAllowed });
+    const ok = filterPlayable(tracks, this.blocklist, { allowPreviews: this.previewsAllowed });
+    this.remember(ok);
+    return ok;
+  }
+
+  /** Tracks this session has already been shown (rows, earlier searches), newest last. */
+  private readonly seen = new Map<string, Track>();
+  private remember(tracks: Track[]): void {
+    for (const t of tracks) {
+      const key = `${t.provider}:${t.providerTrackId}`;
+      this.seen.delete(key);
+      this.seen.set(key, t);
+    }
+    while (this.seen.size > SEEN_MAX) this.seen.delete(this.seen.keys().next().value as string);
+  }
+
+  /**
+   * Instant answers while a search is on its way: tracks already seen in this session (plus
+   * `extra`, e.g. the listener's history and favourites) whose title or artist contains every
+   * word typed. No network request.
+   */
+  quickMatches(query: string, limit = 6, extra: Track[] = []): Track[] {
+    if (normalizeText(query).length < 2) return [];
+    const pool = new Map<string, Track>();
+    for (const t of [...extra, ...[...this.seen.values()].reverse()]) {
+      const key = `${t.provider}:${t.providerTrackId}`;
+      if (!pool.has(key) && this.isTrackPlayable(t)) pool.set(key, t);
+    }
+    return [...pool.values()]
+      .map((t) => ({ t, s: scoreSearch(query, t) }))
+      .filter((x) => x.s.matched === 1)
+      .sort((a, b) => b.s.score - a.s.score)
+      .slice(0, limit)
+      .map((x) => x.t);
   }
 
   /** Best title match first, Hindi/Indian music ahead of the rest (see rank.ts). */
   async searchTracks(query: string, page?: PageOpts, opts: SearchOpts = {}): Promise<Track[]> {
     const pick = (p: MusicProvider) => (opts.userSearch || !p.onDemandSearch) && !opts.exclude?.includes(p.id);
-    return rankSearch(query, this.playable(await this.fanOut((p) => p.searchTracks(query, page), pick)));
+    const rank = (found: Track[]) => rankSearch(query, this.playable(found));
+    const { onPartial, signal } = opts;
+    return rank(
+      await this.fanOut((p) => p.searchTracks(query, page), {
+        pick,
+        signal,
+        onPartial: onPartial && ((found) => onPartial(rank(found))),
+      }),
+    );
   }
 
   /** Live radio stations for the given tags (e.g. bollywood, 90s, bhajan). */
@@ -205,8 +293,9 @@ export class MusicService {
   async getHindiHits(limit = 20): Promise<Track[]> {
     const lists = await Promise.all(
       // the Archive is slow and has no play counts, radio has no songs: both stay out of this row
+      // only the most-played ordering is asked for: the row is sorted by plays anyway (half the requests)
       ['hindi', 'bollywood', 'hindi song', 'arijit singh'].map((q) =>
-        this.searchTracks(q, { limit: 50 }, { exclude: ['archive', 'radio'] }).catch(() => [] as Track[]),
+        this.searchTracks(q, { limit: 50, sort: 'popular' }, { exclude: ['archive', 'radio'] }).catch(() => [] as Track[]),
       ),
     );
     const seen = new Set<string>();
@@ -284,6 +373,8 @@ function withinBudget<T>(work: Promise<T[]>, ms?: number): Promise<T[]> {
     );
   });
 }
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 function interleave<T>(lists: T[][]): T[] {
   if (lists.length === 1) return lists[0];
