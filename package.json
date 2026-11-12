@@ -22,7 +22,12 @@
     "apk": "node scripts/build-apk.mjs",
     "test:e2e": "node scripts/e2e-playback.mjs",
     "youtube": "node scripts/setup-youtube.mjs",
-    "admin": "node scripts/create-admin.mjs"
+    "admin": "node scripts/create-admin.mjs",
+    "build:site": "node scripts/build-site.mjs",
+    "db:migrate": "node scripts/db-migrate.mjs",
+    "serve": "node scripts/dev-server.mjs",
+    "test:backend": "node scripts/backend-test.mjs",
+    "typecheck:api": "tsc -p api/tsconfig.json"
   },
   "devDependencies": {
     "sharp": "^0.33.5",
@@ -30,6 +35,9 @@
     "vitest": "^2.1.8"
   },
   "engines": {
-    "node": ">=18.18"
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "1.2.0"
   }
 }

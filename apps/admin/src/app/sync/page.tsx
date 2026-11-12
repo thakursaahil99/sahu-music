@@ -5,7 +5,7 @@ import { AUDIUS_GENRES, AudiusProvider, isPlayable } from '@sahu/api';
 import type { Track } from '@sahu/models';
 import { sanitizeQuery } from '@sahu/shared';
 import { PageTitle, useAdmin } from '@/components/AdminShell';
-import { audiusAppName, supabase } from '@/lib/supabase';
+import { api, audiusAppName, reportError } from '@/lib/backend';
 
 const audius = new AudiusProvider({ appName: audiusAppName });
 
@@ -24,8 +24,6 @@ export default function SyncPage() {
     setBusy(true);
     setLog(null);
     try {
-      const { data: prov } = await supabase!.from('music_providers').select('enabled').eq('id', 'audius').maybeSingle();
-      if (prov && !prov.enabled) throw new Error('The Audius provider is disabled. Enable it under Music providers first.');
       const q = sanitizeQuery(query);
       if (mode === 'search' && q.length < 2) throw new Error('Enter a search term (at least 2 characters).');
       const list = mode === 'search' ? await audius.searchTracks(q, { limit }) : await audius.getTrending({ genre: genre || undefined, limit });
@@ -34,7 +32,7 @@ export default function SyncPage() {
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Fetch failed';
       notify(message, 'error');
-      void supabase!.from('api_errors').insert({ provider: 'audius', endpoint: mode === 'search' ? '/v1/tracks/search' : '/v1/tracks/trending', status: 0, message: message.slice(0, 300), client: 'admin' });
+      reportError('audius', mode === 'search' ? '/v1/tracks/search' : '/v1/tracks/trending', message);
     }
     setBusy(false);
   };
@@ -42,41 +40,20 @@ export default function SyncPage() {
   const importSelected = async () => {
     if (!tracks) return;
     setBusy(true);
+    // Only tracks the provider confirms as streamable can enter the catalogue at all.
+    const chosen = tracks.filter((t) => selected.has(t.providerTrackId) && isPlayable(t));
     let imported = 0;
     let failed = 0;
-    for (const t of tracks) {
-      // Only tracks the provider confirms as streamable can enter the catalogue at all.
-      if (!selected.has(t.providerTrackId) || !isPlayable(t)) continue;
-      let artistId: string | null = null;
-      if (t.artistId) {
-        const { data } = await supabase!
-          .from('artists')
-          .upsert({ provider: 'audius', provider_artist_id: t.artistId, name: t.artist }, { onConflict: 'provider,provider_artist_id' })
-          .select('id')
-          .maybeSingle();
-        artistId = (data?.id as string) ?? null;
+    try {
+      for (let i = 0; i < chosen.length; i += 20) {
+        const r = await api<{ imported: number; failed: number }>('POST', 'admin/import', { provider: 'audius', tracks: chosen.slice(i, i + 20) });
+        imported += r.imported;
+        failed += r.failed;
       }
-      // is_public is deliberately omitted: new songs default to private, existing ones keep their state.
-      const { data: song, error } = await supabase!
-        .from('songs')
-        .upsert(
-          { provider: 'audius', provider_track_id: t.providerTrackId, title: t.title.slice(0, 300), artist_name: t.artist, artist_id: artistId, artwork_url: t.artwork, stream_url: t.streamUrl, permalink: t.permalink ?? null, duration: Math.round(t.duration), genre: t.genre ?? null },
-          { onConflict: 'provider,provider_track_id' },
-        )
-        .select('id')
-        .maybeSingle();
-      if (error || !song) {
-        failed++;
-        continue;
-      }
-      // ignoreDuplicates: an existing decision (approved / rejected / blocked) is never overwritten by a sync.
-      await supabase!.from('music_rights').upsert(
-        { song_id: song.id, provider: 'audius', provider_track_id: t.providerTrackId, rights_status: 'pending', streaming_permitted: true, commercial_use: t.rights.commercialUse, advertising: 'unconfirmed', license: t.rights.license, evidence: t.rights.basis },
-        { onConflict: 'provider,provider_track_id', ignoreDuplicates: true },
-      );
-      imported++;
+    } catch (e) {
+      setBusy(false);
+      return notify(e instanceof Error ? e.message : 'Sync failed', 'error');
     }
-    await supabase!.from('music_providers').update({ last_sync_at: new Date().toISOString() }).eq('id', 'audius');
     setBusy(false);
     setLog(`${imported} track${imported === 1 ? '' : 's'} synchronised${failed ? `, ${failed} failed` : ''}. New tracks are waiting under Rights verification → pending. Nothing was published.`);
     notify('Sync complete');

@@ -5,7 +5,7 @@ import { AuthProvider } from '@/lib/auth';
 import { LibraryProvider } from '@/lib/library';
 import { PlayerProvider } from '@/lib/player';
 import { SettingsProvider } from '@/lib/settings';
-import { bootstrapCatalogueRules } from '@/lib/supabase';
+import { bootstrapCatalogueRules } from '@/lib/backend';
 import { ToastProvider } from '@/lib/toast';
 import { PwaManager } from './Pwa';
 import { CategoryArtProvider } from './ui';

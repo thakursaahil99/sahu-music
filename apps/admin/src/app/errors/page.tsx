@@ -2,7 +2,7 @@
 
 import { useAdmin } from '@/components/AdminShell';
 import { CrudTable } from '@/components/CrudTable';
-import { supabase } from '@/lib/supabase';
+import { api } from '@/lib/backend';
 
 export default function ErrorsPage() {
   const { notify } = useAdmin();
@@ -21,9 +21,12 @@ export default function ErrorsPage() {
           type="button"
           className="btn-outline"
           onClick={async () => {
-            const cutoff = new Date(Date.now() - 7 * 864e5).toISOString();
-            const { error } = await supabase!.from('api_errors').delete().lt('created_at', cutoff);
-            notify(error ? error.message : 'Deleted errors older than 7 days', error ? 'error' : 'ok');
+            try {
+              const r = await api<{ deleted: number }>('POST', 'admin/prune-errors', { olderThanDays: 7 });
+              notify(`Deleted ${r.deleted} error${r.deleted === 1 ? '' : 's'} older than 7 days`);
+            } catch (e) {
+              notify(e instanceof Error ? e.message : 'Failed', 'error');
+            }
             reload();
           }}
         >

@@ -10,7 +10,7 @@
  *
  * Bump VERSION on every deploy that changes this file to trigger the update notice.
  */
-const VERSION = 'v1.3.0';
+const VERSION = 'v1.4.0';
 const SHELL = `sahu-shell-${VERSION}`;
 const PAGES = `sahu-pages-${VERSION}`;
 const ART = 'sahu-artwork';
@@ -109,6 +109,9 @@ self.addEventListener('fetch', (event) => {
 
   // 0. App downloads (APK): always straight from the network, never cached.
   if (url.pathname.startsWith('/downloads/')) return;
+
+  // 0b. Account API (private, per user) and the admin console: never cached.
+  if (url.origin === self.location.origin && (url.pathname.startsWith('/api/') || url.pathname.startsWith('/admin'))) return;
 
   // 1. Audio: never touched by the service worker.
   if (isAudio(request, url)) return;

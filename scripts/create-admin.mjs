@@ -1,99 +1,92 @@
-// Create (or reset) the main administrator account in Supabase.
+// Create the administrator account, or make an existing account an admin, in the Neon database.
 //
-//   npm run admin -- EMAIL PASSWORD
+//   npm run admin -- EMAIL PASSWORD     create the account (or reset its password) and make it admin
+//   npm run admin -- EMAIL              make an account that already signed up an admin
 //
-// Needs two values in the environment (this terminal only, never in a file that ships):
-//   SUPABASE_URL                 project URL (falls back to NEXT_PUBLIC_SUPABASE_URL in apps/*/.env.local)
-//   SUPABASE_SERVICE_ROLE_KEY    Project Settings → API → service_role key
-//
-// What it does:
-//   1. creates the account with the email already confirmed, or resets the password if it exists
-//   2. sets role = 'admin' and clears the blocked flag on its profile
-// Nothing is written to disk. The password is sent only to your Supabase project.
-import { existsSync, readFileSync } from 'node:fs';
+// The database address comes from DATABASE_URL, or from `--env-file FILE`, or (if neither is set)
+// it is pulled from the linked Vercel project into a temporary file that is deleted afterwards.
+// The password is hashed here (scrypt, same format as the API) and only the hash is stored.
+import { execFileSync } from 'node:child_process';
+import { randomBytes, scrypt as scryptCb } from 'node:crypto';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createClient } from '@supabase/supabase-js';
+import { neon } from '@neondatabase/serverless';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const args = process.argv.slice(2).filter((a, i, all) => a !== '--env-file' && all[i - 1] !== '--env-file');
+const [rawEmail, password] = args;
+const email = (rawEmail ?? '').trim().toLowerCase();
 
-function fromEnvFiles(name) {
-  for (const app of ['web', 'admin']) {
-    const file = join(root, 'apps', app, '.env.local');
-    if (!existsSync(file)) continue;
-    const line = readFileSync(file, 'utf8').split(/\r?\n/).find((l) => l.startsWith(`${name}=`));
-    const value = line?.slice(name.length + 1).trim().replace(/^["']|["']$/g, '');
-    if (value) return value;
-  }
-  return '';
-}
-
-const email = (process.argv[2] ?? process.env.ADMIN_EMAIL ?? '').trim().toLowerCase();
-const password = process.argv[3] ?? process.env.ADMIN_PASSWORD ?? '';
-const url = (process.env.SUPABASE_URL ?? '').trim() || fromEnvFiles('NEXT_PUBLIC_SUPABASE_URL');
-const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim();
-
-function fail(message) {
-  console.error(message);
+if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || (password !== undefined && (password.length < 8 || password.length > 128))) {
+  console.error('Usage: npm run admin -- EMAIL [PASSWORD]   (password: 8–128 characters)');
   process.exit(1);
 }
 
-if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !password) {
-  fail('Usage: npm run admin -- EMAIL PASSWORD');
-}
-if (password.length < 6 || password.length > 72) fail('The password must be 6 to 72 characters long.');
-if (!url) {
-  fail(`No Supabase project found.
-  1. Create a project at https://supabase.com and run the files in supabase/migrations in order (SQL editor).
-  2. Put NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in apps/web/.env.local and apps/admin/.env.local.
-  3. Run this command again.`);
-}
-if (!serviceKey) {
-  fail(`SUPABASE_SERVICE_ROLE_KEY is not set.
-  Copy the service_role key from Supabase → Project Settings → API and set it for this terminal only:
-    PowerShell:  $env:SUPABASE_SERVICE_ROLE_KEY = "..."
-    bash:        export SUPABASE_SERVICE_ROLE_KEY="..."
-  Do not save it in any .env file used by the apps.`);
-}
-
-const supabase = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-
-async function findUser() {
-  for (let page = 1; ; page += 1) {
-    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 200 });
-    if (error) throw new Error(`Could not list users: ${error.message}`);
-    const hit = data.users.find((u) => u.email?.toLowerCase() === email);
-    if (hit) return hit;
-    if (data.users.length < 200) return null;
+function loadEnv(file) {
+  for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const m = /^([A-Z0-9_]+)=(.*)$/.exec(line);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^"(.*)"$/, '$1');
   }
+}
+
+const envArg = process.argv.indexOf('--env-file');
+if (envArg > 0) loadEnv(process.argv[envArg + 1]);
+if (!process.env.DATABASE_URL) {
+  const dir = mkdtempSync(join(tmpdir(), 'sahu-env-'));
+  const file = join(dir, '.env');
+  try {
+    console.log('Fetching the database address from Vercel…');
+    execFileSync('vercel', ['env', 'pull', file, '--environment=production', '--yes'], { cwd: root, stdio: 'ignore', shell: process.platform === 'win32' });
+    if (existsSync(file)) loadEnv(file);
+  } catch {
+    /* handled below */
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+if (!process.env.DATABASE_URL) {
+  console.error('No DATABASE_URL. Run "vercel link" first, or pass --env-file with the Neon connection string.');
+  process.exit(1);
+}
+
+const N = 32768, R = 8, P = 1;
+function hashPassword(pw) {
+  const salt = randomBytes(16);
+  return new Promise((res, rej) =>
+    scryptCb(pw.normalize('NFKC'), salt, 64, { N, r: R, p: P, maxmem: 128 * N * R * 2 }, (e, key) =>
+      e ? rej(e) : res(`scrypt$${N}$${R}$${P}$${salt.toString('base64')}$${key.toString('base64')}`),
+    ),
+  );
 }
 
 async function main() {
-  let user = await findUser();
-  if (user) {
-    const { error } = await supabase.auth.admin.updateUserById(user.id, { password, email_confirm: true });
-    if (error) throw new Error(`Could not reset the password: ${error.message}`);
-    console.log(`Account ${email} already existed; password reset.`);
-  } else {
-    const { data, error } = await supabase.auth.admin.createUser({ email, password, email_confirm: true });
-    if (error) throw new Error(`Could not create the account: ${error.message}`);
-    user = data.user;
-    console.log(`Account ${email} created.`);
+  const sql = neon(process.env.DATABASE_URL);
+  let [user] = await sql.query('select id from users where email = $1', [email]);
+  if (!user && password === undefined) {
+    console.error(`No account for ${email}. Sign up on the website first, or pass a password to create it.`);
+    process.exitCode = 1;
+    return;
   }
-
-  const { error: roleError } = await supabase
-    .from('profiles')
-    .upsert({ id: user.id, role: 'admin', is_blocked: false }, { onConflict: 'id' });
-  if (roleError) {
-    throw new Error(`Could not grant the admin role: ${roleError.message}
-  Have the files in supabase/migrations been run on this project?`);
+  if (password !== undefined) {
+    const hash = await hashPassword(password);
+    [user] = await sql.query(
+      `insert into users (email, password_hash) values ($1, $2)
+       on conflict (email) do update set password_hash = excluded.password_hash returning id`,
+      [email, hash],
+    );
+    await sql.query('delete from sessions where user_id = $1', [user.id]);
   }
-
-  const { data: profile, error: readError } = await supabase.from('profiles').select('role, is_blocked').eq('id', user.id).single();
-  if (readError || profile.role !== 'admin' || profile.is_blocked) {
-    throw new Error(`The admin role did not stick: ${readError?.message ?? JSON.stringify(profile)}`);
-  }
-  console.log(`${email} is now an administrator. Sign in to the admin console with this email and password.`);
+  await sql.query(
+    `insert into profiles (id, display_name, role, is_blocked) values ($1, $2, 'admin', false)
+     on conflict (id) do update set role = 'admin', is_blocked = false`,
+    [user.id, 'Admin'],
+  );
+  console.log(`${email} is an administrator. Sign in at /admin.`);
 }
 
-main().catch((err) => fail(err.message));
+main().catch((e) => {
+  console.error(e.message);
+  process.exitCode = 1;
+});

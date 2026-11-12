@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { isSafeId } from '@sahu/shared';
 import { PageTitle, useAdmin } from '@/components/AdminShell';
-import { supabase } from '@/lib/supabase';
+import { adminTable, api } from '@/lib/backend';
 
 type Status = 'pending' | 'approved' | 'rejected' | 'blocked';
 type Perm = 'allowed' | 'not_allowed' | 'unconfirmed';
@@ -43,28 +43,34 @@ export default function RightsPage() {
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    supabase!
-      .from('music_rights')
-      .select('*, songs(title, artist_name, artwork_url, permalink, is_public)', { count: 'exact' })
-      .eq('rights_status', status)
-      .order('created_at', { ascending: false })
-      .range(page * PAGE, page * PAGE + PAGE - 1)
-      .then(({ data, error, count: c }) => {
+    api<{ rows: RightsRow[]; count: number }>('POST', 'admin/rights', { op: 'list', status, offset: page * PAGE, limit: PAGE }).then(
+      (r) => {
         if (!alive) return;
-        if (error) notify(error.message, 'error');
-        setRows((data as unknown as RightsRow[]) ?? []);
-        setCount(c ?? 0);
+        setRows(r.rows);
+        setCount(r.count);
         setLoading(false);
-      });
+      },
+      (e) => {
+        if (!alive) return;
+        notify(e instanceof Error ? e.message : 'Could not load', 'error');
+        setRows([]);
+        setCount(0);
+        setLoading(false);
+      },
+    );
     return () => {
       alive = false;
     };
   }, [status, page, tick, notify]);
 
   const patch = async (row: RightsRow, changes: Partial<RightsRow>) => {
-    const { error } = await supabase!.from('music_rights').update(changes).eq('id', row.id);
-    if (error) notify(error.message, 'error');
-    return !error;
+    try {
+      await api('POST', 'admin/rights', { op: 'update', id: row.id, changes });
+      return true;
+    } catch (e) {
+      notify(e instanceof Error ? e.message : 'Save failed', 'error');
+      return false;
+    }
   };
 
   /** Decide a track. Publishing happens only after the rights record is approved (the DB enforces the order). */
@@ -74,8 +80,11 @@ export default function RightsPage() {
     }
     if (!(await patch(row, { rights_status: next }))) return;
     if (row.song_id) {
-      const { error } = await supabase!.from('songs').update({ is_public: next === 'approved' }).eq('id', row.song_id);
-      if (error) return notify(error.message, 'error');
+      try {
+        await adminTable.update('songs', row.song_id, { is_public: next === 'approved' });
+      } catch (e) {
+        return notify(e instanceof Error ? e.message : 'Publishing failed', 'error');
+      }
     }
     notify(next === 'approved' ? 'Approved and published' : `Marked ${next}; track is not playable`);
     reload();
@@ -85,11 +94,11 @@ export default function RightsPage() {
     e.preventDefault();
     const id = blockId.trim();
     if (!isSafeId(id)) return notify('Enter a valid provider track ID (letters, numbers, - or _).', 'error');
-    const { error } = await supabase!.from('music_rights').upsert(
-      { provider: blockProvider, provider_track_id: id, rights_status: 'blocked', streaming_permitted: false, evidence: blockReason.trim().slice(0, 500) || 'Blocked by administrator.' },
-      { onConflict: 'provider,provider_track_id' },
-    );
-    if (error) return notify(error.message, 'error');
+    try {
+      await api('POST', 'admin/rights', { op: 'block', provider: blockProvider, providerTrackId: id, reason: blockReason.trim().slice(0, 500) });
+    } catch (e) {
+      return notify(e instanceof Error ? e.message : 'Block failed', 'error');
+    }
     // if this track is also in the curated catalogue, the DB trigger has already unpublished it
     notify('Track blocked. It disappears from the website and apps on their next load.');
     setBlockId('');
@@ -112,6 +121,9 @@ export default function RightsPage() {
           <label htmlFor="bp" className="mb-1 block text-xs text-muted">Provider</label>
           <select id="bp" className="input" value={blockProvider} onChange={(e) => setBlockProvider(e.target.value)}>
             <option value="audius">audius</option>
+            <option value="youtube">youtube</option>
+            <option value="archive">archive</option>
+            <option value="radio">radio</option>
             <option value="jamendo">jamendo</option>
           </select>
         </div>

@@ -1,15 +1,36 @@
 import type { Permission, ProviderId, Track } from '@sahu/models';
-import { supabase } from './supabase';
+import { api } from './backend';
+
+/** A row of the public_songs view. */
+interface PublicSong {
+  provider: string;
+  provider_track_id: string;
+  title: string;
+  artist_name: string | null;
+  provider_artist_id: string | null;
+  artwork_url: string | null;
+  stream_url: string;
+  duration: number | null;
+  genre: string | null;
+  permalink: string | null;
+  commercial_use: string | null;
+  advertising: string | null;
+  license: string | null;
+  evidence: string | null;
+}
 
 /**
  * Admin-verified catalogue ("Verified by SAHU MUSIC").
- * Reads the `public_songs` view, which only exposes songs whose rights record
- * is approved with streaming permission – enforced in the database by RLS + a trigger.
+ * The backend reads the `public_songs` view, which only exposes songs whose rights record
+ * is approved with streaming permission – enforced in the database by a trigger.
  */
 export async function fetchVerifiedSongs(limit = 20): Promise<Track[]> {
-  if (!supabase) return [];
-  const { data, error } = await supabase.from('public_songs').select('*').order('created_at', { ascending: false }).limit(limit);
-  if (error || !data) return [];
+  let data: PublicSong[];
+  try {
+    data = (await api<{ songs: PublicSong[] }>('GET', `catalogue?limit=${limit}`)).songs;
+  } catch {
+    return [];
+  }
   return data
     .filter((r) => typeof r.stream_url === 'string' && r.stream_url.startsWith('https://'))
     .map((r) => ({

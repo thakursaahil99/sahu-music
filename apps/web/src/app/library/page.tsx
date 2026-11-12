@@ -61,7 +61,7 @@ function LibraryInner() {
                   <Link href="/login" className="font-semibold text-gold underline">Log in</Link> to keep them in your account across devices.
                 </>
               ) : (
-                'Account sync becomes available once the site owner connects Supabase (see README).'
+                'Account sync is not available on this deployment yet.'
               )}
             </p>
           </ConfigNotice>

@@ -10,11 +10,15 @@ import { useLibrary } from '@/lib/library';
 import { useToast } from '@/lib/toast';
 
 export default function ProfilePage() {
-  const { user, profile, loading, configured, updateProfile, signOut } = useAuth();
+  const { user, profile, loading, configured, updateProfile, signOut, changePassword, deleteAccount } = useAuth();
   const lib = useLibrary();
   const toast = useToast();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
 
   useEffect(() => {
     setName(profile?.display_name ?? '');
@@ -29,7 +33,7 @@ export default function ProfilePage() {
         {!configured && (
           <div className="mb-5">
             <ConfigNotice title="Accounts are not configured on this deployment">
-              <p>Connect a free Supabase project to enable sign-up and login (see README). Guest mode works without it.</p>
+              <p>Accounts need the SAHU MUSIC backend and a database. Deploy on Vercel with the free Neon database connected (see README). Guest mode works without it.</p>
             </ConfigNotice>
           </div>
         )}
@@ -87,13 +91,59 @@ export default function ProfilePage() {
         </button>
       </form>
 
-      <div className="flex gap-3">
+      <form
+        className="card mb-6 space-y-3"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (next.length < 8) return toast('New password must be at least 8 characters.', 'error');
+          setBusy(true);
+          const err = await changePassword(current, next);
+          setBusy(false);
+          if (!err) {
+            setCurrent('');
+            setNext('');
+          }
+          toast(err ?? 'Password changed. Other devices were signed out.', err ? 'error' : 'info');
+        }}
+      >
+        <h2 className="text-sm font-medium text-white">Change password</h2>
+        <input type="password" className="input" placeholder="Current password" aria-label="Current password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} maxLength={128} />
+        <input type="password" className="input" placeholder="New password (8+ characters)" aria-label="New password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} maxLength={128} />
+        <button type="submit" className="btn-outline" disabled={busy || !current || !next}>Change password</button>
+      </form>
+
+      <div className="mb-6 flex gap-3">
         <Link href="/settings" className="btn-outline">
           <Icon name="settings" size={16} /> Settings
         </Link>
         <button type="button" className="btn-outline" onClick={() => void signOut()}>
           Log out
         </button>
+      </div>
+
+      <div className="card border border-red-500/20">
+        <h2 className="text-sm font-medium text-white">Delete account</h2>
+        <p className="mt-1 text-xs text-muted">Removes your account, favourites, playlists, history and preferences for good.</p>
+        {confirmDelete ? (
+          <form
+            className="mt-3 space-y-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setBusy(true);
+              const err = await deleteAccount(deletePassword);
+              setBusy(false);
+              toast(err ?? 'Your account was deleted.', err ? 'error' : 'info');
+            }}
+          >
+            <input type="password" className="input" placeholder="Enter your password to confirm" aria-label="Password" autoComplete="current-password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} maxLength={128} />
+            <div className="flex gap-3">
+              <button type="submit" className="btn-outline !border-red-500/60 !text-red-300" disabled={busy || !deletePassword}>Delete for good</button>
+              <button type="button" className="btn-outline" onClick={() => setConfirmDelete(false)}>Cancel</button>
+            </div>
+          </form>
+        ) : (
+          <button type="button" className="mt-3 text-sm font-semibold text-red-300 hover:text-red-200" onClick={() => setConfirmDelete(true)}>Delete my account…</button>
+        )}
       </div>
     </div>
   );

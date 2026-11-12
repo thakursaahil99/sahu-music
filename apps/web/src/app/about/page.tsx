@@ -57,7 +57,7 @@ export default function AboutPage() {
 
       <h2>Open and free-first</h2>
       <p>
-        SAHU MUSIC is built with open-source tools (Next.js, Flutter, Supabase) and runs on free hosting tiers. Advertising is optional and never interrupts
+        SAHU MUSIC is built with open-source tools (Next.js, Flutter, PostgreSQL on Neon) and runs on free hosting tiers. Advertising is optional and never interrupts
         playback.
       </p>
 

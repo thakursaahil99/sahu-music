@@ -19,13 +19,13 @@ export default function PrivacyPage() {
       </p>
 
       <h2>2. Accounts</h2>
-      <p>If you create an account we store, in our Supabase database:</p>
+      <p>If you create an account we store, in our database (Neon PostgreSQL):</p>
       <ul>
-        <li>your email address and a securely hashed password (handled by Supabase Authentication);</li>
+        <li>your email address and your password, stored only as a salted scrypt hash (we can never see the password itself);</li>
         <li>your display name;</li>
         <li>your favourites, playlists, listening history and preferences.</li>
       </ul>
-      <p>Database row-level security ensures that only you can read or change your personal library data.</p>
+      <p>Every request for your library is checked against your signed-in session, so only you can read or change your personal data. You can delete your account and all of this data from your Profile at any time. Sign-in uses a secure, HttpOnly cookie that only keeps you logged in; we use no tracking cookies.</p>
 
       <h2>3. Music providers</h2>
       <p>

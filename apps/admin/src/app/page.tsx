@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { PageTitle } from '@/components/AdminShell';
-import { audiusAppName, supabase } from '@/lib/supabase';
+import { api, audiusAppName } from '@/lib/backend';
 
 interface Stats {
   users: number; admins: number; blocked_users: number; songs: number; public_songs: number; artists: number; albums: number;
@@ -31,10 +31,7 @@ export default function DashboardPage() {
   const [health, setHealth] = useState<Health | null>(null);
 
   useEffect(() => {
-    supabase!.rpc('admin_stats').then(({ data, error: err }) => {
-      if (err) setError(err.message);
-      else setStats(data as Stats);
-    });
+    api<Stats>('GET', 'admin/stats').then(setStats, (e) => setError(e instanceof Error ? e.message : 'Could not load figures.'));
     const started = performance.now();
     fetch(`https://api.audius.co/v1/tracks/trending?limit=1&app_name=${encodeURIComponent(audiusAppName)}`)
       .then(async (r) => {
@@ -47,7 +44,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <PageTitle title="Dashboard" subtitle="Live figures from your Supabase database." />
+      <PageTitle title="Dashboard" subtitle="Live figures from the Neon database." />
       {error && <p className="mb-4 rounded-lg bg-red-950/60 px-3 py-2 text-sm text-red-300" role="alert">Could not load analytics: {error}</p>}
       {!stats && !error && <p className="text-sm text-muted">Loading…</p>}
       {stats && (

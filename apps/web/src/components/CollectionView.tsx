@@ -13,7 +13,7 @@ import { Icon } from './icons';
 import { TrackList } from './tracks';
 import { EmptyState, ErrorState, ListSkeleton } from './ui';
 
-/** A user's own playlist (guest: this device, signed in: Supabase). */
+/** A user's own playlist (guest: this device, signed in: the account backend). */
 function UserPlaylistView({ id }: { id: string }) {
   const router = useRouter();
   const { playlists, ready, renamePlaylist, deletePlaylist, removeFromPlaylist } = useLibrary();

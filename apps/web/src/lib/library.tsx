@@ -5,13 +5,13 @@ import { trackKey, type HistoryEntry, type Track, type UserPlaylist } from '@sah
 import { validateTitle } from '@sahu/shared';
 import { useAuth } from './auth';
 import { readLocal, writeLocal } from './hooks';
-import { supabase } from './supabase';
+import { api } from './backend';
 import { useToast } from './toast';
 
 /**
  * User library: favourites, playlists and listening history.
  * - Guests: stored on this device (localStorage).
- * - Signed-in users: stored in Supabase, protected by Row Level Security.
+ * - Signed-in users: stored in the SAHU MUSIC backend (Neon), only ever readable by the owner.
  * Only metadata is stored – never audio.
  */
 
@@ -57,32 +57,12 @@ function loadGuest(): LibraryState {
   };
 }
 
-async function loadRemote(userId: string): Promise<LibraryState> {
-  const sb = supabase!;
-  const [fav, hist, pls] = await Promise.all([
-    sb.from('favorites').select('track, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(1000),
-    sb.from('listening_history').select('track, played_at').eq('user_id', userId).order('played_at', { ascending: false }).limit(HISTORY_MAX),
-    sb
-      .from('playlists')
-      .select('id, title, description, is_public, created_at, playlist_songs(track, position)')
-      .eq('owner_id', userId)
-      .order('created_at', { ascending: false }),
-  ]);
-  if (fav.error || hist.error || pls.error) throw new Error((fav.error || hist.error || pls.error)!.message);
+async function loadRemote(): Promise<LibraryState> {
+  const data = await api<{ favorites: Track[]; history: HistoryEntry[]; playlists: UserPlaylist[] }>('GET', 'library');
   return {
-    favorites: (fav.data ?? []).map((r) => r.track as Track),
-    history: (hist.data ?? []).map((r) => ({ track: r.track as Track, playedAt: r.played_at as string })),
-    playlists: (pls.data ?? []).map((p) => ({
-      id: p.id as string,
-      title: p.title as string,
-      description: (p.description as string) ?? '',
-      isPublic: !!p.is_public,
-      createdAt: p.created_at as string,
-      tracks: ((p.playlist_songs as { track: Track; position: number }[]) ?? [])
-        .slice()
-        .sort((a, b) => a.position - b.position)
-        .map((s) => s.track),
-    })),
+    favorites: data.favorites ?? [],
+    history: (data.history ?? []).slice(0, HISTORY_MAX),
+    playlists: data.playlists ?? [],
   };
 }
 
@@ -92,7 +72,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<LibraryState>(EMPTY);
   const [ready, setReady] = useState(false);
   const userId = user?.id ?? null;
-  const remote = !!(supabase && userId);
+  const remote = !!userId;
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -100,8 +80,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     if (authLoading) return;
     let alive = true;
     setReady(false);
-    if (supabase && userId) {
-      loadRemote(userId).then(
+    if (userId) {
+      loadRemote().then(
         (s) => alive && (setState(s), setReady(true)),
         () => {
           if (!alive) return;
@@ -133,8 +113,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
 
   const fail = useCallback(() => toast('Could not save. Check your connection.', 'error'), [toast]);
   const run = useCallback(
-    (q: PromiseLike<{ error: unknown }>) => {
-      void q.then((r) => r.error && fail(), fail);
+    (q: Promise<unknown>) => {
+      void q.catch(fail);
     },
     [fail],
   );
@@ -149,14 +129,10 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       apply((s) => ({ ...s, favorites: has ? s.favorites.filter((f) => trackKey(f) !== key) : [t, ...s.favorites] }));
       toast(has ? 'Removed from Favourites' : 'Added to Favourites');
       if (remote && persistable(t)) {
-        run(
-          has
-            ? supabase!.from('favorites').delete().match({ user_id: userId, provider: t.provider, provider_track_id: t.providerTrackId })
-            : supabase!.from('favorites').upsert({ user_id: userId, provider: t.provider, provider_track_id: t.providerTrackId, track: t }),
-        );
+        run(has ? api('POST', 'favorites/remove', { provider: t.provider, providerTrackId: t.providerTrackId }) : api('POST', 'favorites/add', { track: t }));
       }
     },
-    [apply, remote, run, toast, userId],
+    [apply, remote, run, toast],
   );
 
   const addHistory = useCallback(
@@ -165,16 +141,16 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       const playedAt = new Date().toISOString();
       apply((s) => ({ ...s, history: [{ track: t, playedAt }, ...s.history.filter((h) => trackKey(h.track) !== key)].slice(0, HISTORY_MAX) }));
       if (remote && persistable(t)) {
-        run(supabase!.from('listening_history').insert({ user_id: userId, provider: t.provider, provider_track_id: t.providerTrackId, track: t }));
+        run(api('POST', 'history/add', { track: t }));
       }
     },
-    [apply, remote, run, userId],
+    [apply, remote, run],
   );
 
   const clearHistory = useCallback(() => {
     apply((s) => ({ ...s, history: [] }));
-    if (remote) run(supabase!.from('listening_history').delete().eq('user_id', userId));
-  }, [apply, remote, run, userId]);
+    if (remote) run(api('POST', 'history/clear', {}));
+  }, [apply, remote, run]);
 
   const createPlaylist = useCallback(
     async (rawTitle: string): Promise<string | null> => {
@@ -186,8 +162,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       const title = rawTitle.trim();
       const pl: UserPlaylist = { id: crypto.randomUUID(), title, description: '', isPublic: false, tracks: [], createdAt: new Date().toISOString() };
       if (remote) {
-        const { error } = await supabase!.from('playlists').insert({ id: pl.id, owner_id: userId, title, is_public: false });
-        if (error) {
+        try {
+          await api('POST', 'playlists/create', { id: pl.id, title });
+        } catch {
           fail();
           return null;
         }
@@ -196,7 +173,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       toast(`Playlist "${title}" created`);
       return pl.id;
     },
-    [apply, fail, remote, toast, userId],
+    [apply, fail, remote, toast],
   );
 
   const renamePlaylist = useCallback(
@@ -205,7 +182,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       if (err) return toast(err, 'error');
       const title = rawTitle.trim();
       apply((s) => ({ ...s, playlists: s.playlists.map((p) => (p.id === id ? { ...p, title } : p)) }));
-      if (remote) run(supabase!.from('playlists').update({ title }).eq('id', id));
+      if (remote) run(api('POST', 'playlists/rename', { id, title }));
     },
     [apply, remote, run, toast],
   );
@@ -213,7 +190,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const deletePlaylist = useCallback(
     (id: string) => {
       apply((s) => ({ ...s, playlists: s.playlists.filter((p) => p.id !== id) }));
-      if (remote) run(supabase!.from('playlists').delete().eq('id', id));
+      if (remote) run(api('POST', 'playlists/delete', { id }));
       toast('Playlist deleted');
     },
     [apply, remote, run, toast],
@@ -227,8 +204,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       apply((s) => ({ ...s, playlists: s.playlists.map((p) => (p.id === id ? { ...p, tracks: [...p.tracks, t] } : p)) }));
       toast(`Added to ${pl.title}`);
       if (remote && persistable(t)) {
-        const position = Date.now(); // monotonic ordering key
-        run(supabase!.from('playlist_songs').insert({ playlist_id: id, provider: t.provider, provider_track_id: t.providerTrackId, track: t, position }));
+        run(api('POST', 'playlists/add-track', { playlistId: id, track: t }));
       }
     },
     [apply, remote, run, toast],
@@ -238,7 +214,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     (id: string, t: Track) => {
       const key = trackKey(t);
       apply((s) => ({ ...s, playlists: s.playlists.map((p) => (p.id === id ? { ...p, tracks: p.tracks.filter((x) => trackKey(x) !== key) } : p)) }));
-      if (remote) run(supabase!.from('playlist_songs').delete().match({ playlist_id: id, provider: t.provider, provider_track_id: t.providerTrackId }));
+      if (remote) run(api('POST', 'playlists/remove-track', { playlistId: id, provider: t.provider, providerTrackId: t.providerTrackId }));
     },
     [apply, remote, run],
   );

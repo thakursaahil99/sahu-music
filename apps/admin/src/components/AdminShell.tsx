@@ -3,9 +3,17 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { User } from '@supabase/supabase-js';
 import { isValidEmail } from '@sahu/shared';
-import { supabase } from '@/lib/supabase';
+import { api, ApiError, BASE_PATH } from '@/lib/backend';
+
+export interface User {
+  id: string;
+  email: string;
+}
+interface Me {
+  user: User | null;
+  profile: { role: 'user' | 'admin'; is_blocked: boolean } | null;
+}
 
 const NAV = [
   ['/', 'Dashboard'],
@@ -36,7 +44,7 @@ function Brand() {
   return (
     <div className="flex items-center gap-3">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/logo.png" alt="" width={36} height={36} className="rounded-lg" />
+      <img src={`${BASE_PATH}/logo.png`} alt="" width={36} height={36} className="rounded-lg" />
       <div className="leading-tight">
         <p className="text-sm font-extrabold tracking-[0.18em] text-white">
           SAHU <span className="text-gold">MUSIC</span>
@@ -58,7 +66,7 @@ function Centered({ children }: { children: ReactNode }) {
   );
 }
 
-function Login() {
+function Login({ onSignedIn }: { onSignedIn: (me: Me) => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -76,9 +84,12 @@ function Login() {
           if (!isValidEmail(email.trim())) return setError('Enter a valid email address.');
           if (!password) return setError('Enter your password.');
           setBusy(true);
-          const { error: err } = await supabase!.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+          try {
+            onSignedIn(await api<Me>('POST', 'auth/login', { email: email.trim().toLowerCase(), password, client: 'admin' }));
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Sign-in failed.');
+          }
           setBusy(false);
-          if (err) setError(err.message);
         }}
       >
         <div>
@@ -87,7 +98,7 @@ function Login() {
         </div>
         <div>
           <label htmlFor="password" className="mb-1 block text-sm text-white">Password</label>
-          <input id="password" type="password" autoComplete="current-password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} maxLength={72} />
+          <input id="password" type="password" autoComplete="current-password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} maxLength={128} />
         </div>
         {error && <p className="rounded-lg bg-red-950/60 px-3 py-2 text-sm text-red-300" role="alert">{error}</p>}
         <button type="submit" className="btn-gold w-full" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
@@ -99,38 +110,25 @@ function Login() {
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = (usePathname() || '/').replace(/(.)\/$/, '$1');
   const [user, setUser] = useState<User | null>(null);
-  const [state, setState] = useState<'loading' | 'signed-out' | 'checking' | 'admin' | 'denied'>(supabase ? 'loading' : 'signed-out');
+  const [state, setState] = useState<'loading' | 'signed-out' | 'admin' | 'denied' | 'no-backend'>('loading');
   const [toast, setToast] = useState<{ text: string; kind: 'ok' | 'error' } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  useEffect(() => {
-    if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
-      setState(data.session ? 'checking' : 'signed-out');
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      setUser(session?.user ?? null);
-      setState(session ? 'checking' : 'signed-out');
-    });
-    return () => sub.subscription.unsubscribe();
+  // The UI check is a convenience only. The backend checks the admin role on every request.
+  const apply = useCallback((me: Me) => {
+    setUser(me.user);
+    setState(!me.user ? 'signed-out' : me.profile?.role === 'admin' && !me.profile.is_blocked ? 'admin' : 'denied');
   }, []);
 
-  // The UI check is a convenience only. Real enforcement is Row Level Security in the database.
-  const uid = user?.id;
   useEffect(() => {
-    if (!supabase || !uid) return;
-    let alive = true;
-    supabase
-      .from('profiles')
-      .select('role, is_blocked')
-      .eq('id', uid)
-      .maybeSingle()
-      .then(({ data }) => alive && setState(data?.role === 'admin' && !data.is_blocked ? 'admin' : 'denied'));
-    return () => {
-      alive = false;
-    };
-  }, [uid]);
+    api<Me>('GET', 'auth/me').then(apply, (e) => setState(e instanceof ApiError && (e.status === 404 || e.status === 503) ? 'no-backend' : 'signed-out'));
+  }, [apply]);
+
+  const signOut = useCallback(async () => {
+    await api('POST', 'auth/logout', {}).catch(() => undefined);
+    setUser(null);
+    setState('signed-out');
+  }, []);
 
   useEffect(() => setMenuOpen(false), [pathname]);
 
@@ -139,24 +137,22 @@ export function AdminShell({ children }: { children: ReactNode }) {
     setTimeout(() => setToast(null), 4000);
   }, []);
 
-  if (!supabase) {
+  if (state === 'no-backend') {
     return (
       <Centered>
-        <h1 className="text-xl font-bold text-white">Supabase is not configured</h1>
-        <p className="mt-2 text-sm text-white/75">The admin console needs a database. Create a free Supabase project, run the SQL files in <code className="text-gold">supabase/migrations</code>, then add to <code className="text-gold">apps/admin/.env.local</code>:</p>
-        <pre className="mt-3 overflow-x-auto rounded-lg bg-ink p-3 text-xs text-gold-soft">{`NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co\nNEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key`}</pre>
-        <p className="mt-3 text-xs text-muted">Use the anon key only. Never put the service-role key in this app. Restart the dev server after editing the file.</p>
+        <h1 className="text-xl font-bold text-white">The backend is not configured</h1>
+        <p className="mt-2 text-sm text-white/75">The admin console needs the SAHU MUSIC API and its Neon database. Deploy the project on Vercel with the Neon integration connected (see README).</p>
       </Centered>
     );
   }
-  if (state === 'loading' || state === 'checking') return <Centered><p className="text-sm text-muted">Checking access…</p></Centered>;
-  if (state === 'signed-out' || !user) return <Login />;
+  if (state === 'loading') return <Centered><p className="text-sm text-muted">Checking access…</p></Centered>;
+  if (state === 'signed-out' || !user) return <Login onSignedIn={apply} />;
   if (state === 'denied') {
     return (
       <Centered>
         <h1 className="text-xl font-bold text-white">Access denied</h1>
-        <p className="mt-2 text-sm text-white/75">{user.email} is not an administrator. An existing admin (or the project owner, via the SQL editor) must grant the admin role.</p>
-        <button type="button" className="btn-outline mt-5" onClick={() => void supabase!.auth.signOut()}>Sign out</button>
+        <p className="mt-2 text-sm text-white/75">{user.email} is not an administrator. An existing admin must grant the admin role (or the project owner runs <code className="text-gold">npm run admin -- {user.email}</code>).</p>
+        <button type="button" className="btn-outline mt-5" onClick={() => void signOut()}>Sign out</button>
       </Centered>
     );
   }
@@ -178,7 +174,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </nav>
           <div className="border-t border-coal-line pt-3">
             <p className="truncate text-xs text-muted">{user.email}</p>
-            <button type="button" className="mt-2 text-sm font-semibold text-gold" onClick={() => void supabase!.auth.signOut()}>Sign out</button>
+            <button type="button" className="mt-2 text-sm font-semibold text-gold" onClick={() => void signOut()}>Sign out</button>
           </div>
         </aside>
         {menuOpen && <button type="button" className="fixed inset-0 z-30 bg-black/60 md:hidden" aria-label="Close menu" onClick={() => setMenuOpen(false)} />}

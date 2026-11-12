@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAuth } from './auth';
 import { readLocal, writeLocal } from './hooks';
-import { supabase } from './supabase';
+import { api } from './backend';
 
 export interface Settings {
   /** Continue to the next track in the queue automatically. */
@@ -36,21 +36,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   // Signed-in users: preferences follow the account.
   const userId = user?.id;
   useEffect(() => {
-    if (!supabase || !userId) return;
+    if (!userId) return;
     let alive = true;
-    supabase
-      .from('user_preferences')
-      .select('preferences')
-      .eq('user_id', userId)
-      .maybeSingle()
-      .then(({ data }) => {
+    api<{ preferences: Partial<Settings> | null }>('GET', 'preferences')
+      .then((data) => {
         if (!alive || !data?.preferences) return;
         setSettings((s) => {
           const merged = { ...s, ...(data.preferences as Partial<Settings>) };
           writeLocal(KEY, merged);
           return merged;
         });
-      });
+      })
+      .catch(() => undefined);
     return () => {
       alive = false;
     };
@@ -61,12 +58,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setSettings((s) => {
         const next = { ...s, ...patch };
         writeLocal(KEY, next);
-        if (supabase && userId) {
-          void supabase
-            .from('user_preferences')
-            .upsert({ user_id: userId, preferences: next, updated_at: new Date().toISOString() })
-            .then(() => undefined, () => undefined);
-        }
+        if (userId) void api('POST', 'preferences', { preferences: next }).catch(() => undefined);
         return next;
       });
     },

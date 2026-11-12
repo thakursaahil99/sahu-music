@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { sanitizeQuery } from '@sahu/shared';
-import { supabase } from '@/lib/supabase';
+import { adminTable } from '@/lib/backend';
 import { PageTitle, useAdmin } from './AdminShell';
 
 export interface Field {
@@ -66,16 +66,23 @@ export function CrudTable(p: Props) {
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    let q = supabase!.from(table).select('*', { count: 'exact' }).order(orderBy, { ascending }).range(page * PAGE, page * PAGE + PAGE - 1);
-    const term = sanitizeQuery(search, 60).replace(/[%_,()]/g, ' ').trim();
-    if (searchColumn && term) q = q.ilike(searchColumn, `%${term}%`);
-    q.then(({ data, error: err, count: c }) => {
-      if (!alive) return;
-      setError(err?.message ?? null);
-      setRows((data as Row[]) ?? []);
-      setCount(c ?? 0);
-      setLoading(false);
-    });
+    const term = searchColumn ? sanitizeQuery(search, 60).trim() : '';
+    adminTable.list(table, { orderBy, ascending, offset: page * PAGE, limit: PAGE, search: term || undefined }).then(
+      (r) => {
+        if (!alive) return;
+        setError(null);
+        setRows(r.rows);
+        setCount(r.count);
+        setLoading(false);
+      },
+      (e) => {
+        if (!alive) return;
+        setError(e instanceof Error ? e.message : 'Could not load records.');
+        setRows([]);
+        setCount(0);
+        setLoading(false);
+      },
+    );
     return () => {
       alive = false;
     };
@@ -104,19 +111,24 @@ export function CrudTable(p: Props) {
       if (f.maxLength && typeof v === 'string' && v.length > f.maxLength) return notify(`${f.label} is too long (max ${f.maxLength})`, 'error');
       payload[f.key] = v;
     }
-    const res = isNew
-      ? await supabase!.from(table).insert({ ...p.defaults, ...payload })
-      : await supabase!.from(table).update(payload).eq(pk, form[pk] as string);
-    if (res.error) return notify(res.error.message, 'error');
+    try {
+      if (isNew) await adminTable.insert(table, { ...p.defaults, ...payload });
+      else await adminTable.update(table, form[pk], payload);
+    } catch (e) {
+      return notify(e instanceof Error ? e.message : 'Save failed', 'error');
+    }
     notify(isNew ? 'Created' : 'Saved');
     setEditing(null);
     reload();
   };
 
   const remove = async (id: unknown) => {
-    const { error: err } = await supabase!.from(table).delete().eq(pk, id as string);
     setConfirmDelete(null);
-    if (err) return notify(err.message, 'error');
+    try {
+      await adminTable.remove(table, id);
+    } catch (e) {
+      return notify(e instanceof Error ? e.message : 'Delete failed', 'error');
+    }
     notify('Deleted');
     reload();
   };

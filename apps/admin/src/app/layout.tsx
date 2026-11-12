@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: { default: 'SAHU MUSIC Admin', template: '%s · SAHU MUSIC Admin' },
   description: 'Administration console for SAHU MUSIC.',
   robots: { index: false, follow: false },
-  icons: { icon: '/favicon.png' },
+  icons: { icon: '/admin/favicon.png' },
 };
 
 export const viewport: Viewport = { themeColor: '#050505', width: 'device-width', initialScale: 1 };

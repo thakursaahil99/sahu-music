@@ -23,8 +23,6 @@ function resolveSiteUrl(): string {
 
 /** Public runtime configuration. Only NEXT_PUBLIC_* values exist in the browser bundle. */
 export const env = {
-  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || '',
-  supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || '',
   audiusAppName: process.env.NEXT_PUBLIC_AUDIUS_APP_NAME?.trim() || 'SAHU_MUSIC',
   jamendoClientId: process.env.NEXT_PUBLIC_JAMENDO_CLIENT_ID?.trim() || '',
   /** Opt-in 30-second Apple Music preview clips. OFF by default: only complete songs are played. */

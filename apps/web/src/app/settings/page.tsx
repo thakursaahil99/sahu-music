@@ -96,7 +96,7 @@ export default function SettingsPage() {
           <p className="text-sm text-white">Guest mode. <Link href="/login" className="text-gold">Log in</Link> to sync your library.</p>
         ) : (
           <ConfigNotice title="Accounts are not configured">
-            <p>Guest mode is active. Add Supabase keys to enable accounts (see README).</p>
+            <p>Guest mode is active. Accounts need the backend and its database (see README).</p>
           </ConfigNotice>
         )}
       </section>

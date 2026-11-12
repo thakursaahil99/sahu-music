@@ -68,10 +68,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
       {!configured && (
         <div className="mb-5">
           <ConfigNotice title="Accounts are not configured on this deployment">
-            <p>
-              Add <code className="text-gold">NEXT_PUBLIC_SUPABASE_URL</code> and <code className="text-gold">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to{' '}
-              <code className="text-gold">apps/web/.env.local</code> and run the migrations in <code className="text-gold">supabase/migrations</code> (free Supabase tier).
-            </p>
+            <p>Accounts need the SAHU MUSIC backend and a database. Deploy on Vercel with the free Neon database connected (see README).</p>
             <p>Until then you can use everything in guest mode. Your library is saved on this device.</p>
           </ConfigNotice>
         </div>
