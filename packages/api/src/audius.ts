@@ -187,11 +187,15 @@ export class AudiusProvider implements MusicProvider {
       (t) => !seen.has(t.providerTrackId) && !!seen.add(t.providerTrackId),
     );
   }
+  // Search leaves out profiles and playlists without a single track (fan pages named after a
+  // star, empty playlists): opening one would only say "no playable tracks".
   async searchArtists(query: string, page: PageOpts = {}): Promise<Artist[]> {
-    return this.artists(await this.get('/users/search', { query, limit: page.limit ?? 12, offset: page.offset ?? 0 }));
+    const found = this.artists(await this.get('/users/search', { query, limit: page.limit ?? 12, offset: page.offset ?? 0 }));
+    return found.filter((a) => (a.trackCount ?? 0) > 0);
   }
   async searchCollections(query: string, page: PageOpts = {}): Promise<Collection[]> {
-    return this.collections(await this.get('/playlists/search', { query, limit: page.limit ?? 12, offset: page.offset ?? 0 }));
+    const found = this.collections(await this.get('/playlists/search', { query, limit: page.limit ?? 12, offset: page.offset ?? 0 }));
+    return found.filter((c) => c.trackCount > 0);
   }
   async getTrending(opts: TrendingOpts = {}): Promise<Track[]> {
     // A genre from another provider's taxonomy (e.g. "Bollywood") is not an Audius genre.

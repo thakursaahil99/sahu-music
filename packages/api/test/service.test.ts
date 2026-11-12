@@ -178,6 +178,26 @@ describe('MusicService', () => {
     expect(t.artworkMirrors).toEqual(['https://node-b.example', 'https://node-d.example']);
   });
 
+  it('leaves artists and playlists without any track out of search results', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        String(url).includes('/users/search')
+          ? respond([
+              { id: 'u1', name: 'Arijit Singh (fan page)', track_count: 0 },
+              { id: 'u2', name: 'Arijit Singh Covers', track_count: 12 },
+            ])
+          : respond([
+              { id: 'p1', playlist_name: 'Empty', track_count: 0, user: { name: 'A' } },
+              { id: 'p2', playlist_name: 'Hindi', track_count: 5, user: { name: 'B' } },
+            ]),
+      ),
+    );
+    const music = createMusicService({ radio: false, archive: false });
+    expect((await music.searchArtists('arijit')).map((a) => a.providerArtistId)).toEqual(['u2']);
+    expect((await music.searchCollections('hindi')).map((c) => c.providerCollectionId)).toEqual(['p2']);
+  });
+
   it('reports Jamendo as not configured without a client id', () => {
     const jamendo = createMusicService().status().find((p) => p.id === 'jamendo')!;
     expect(jamendo.configured).toBe(false);
