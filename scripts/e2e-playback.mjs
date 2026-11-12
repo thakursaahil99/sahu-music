@@ -135,7 +135,8 @@ async function js(expression) {
 async function waitFor(expression, what, timeoutMs = 30000) {
   const end = Date.now() + timeoutMs;
   for (;;) {
-    const v = await js(expression);
+    // while a page is being replaced, document.body can be null for a moment: keep waiting
+    const v = await js(expression).catch(() => false);
     if (v) return v;
     if (Date.now() > end) throw new Error(`timed out waiting for ${what}`);
     await sleep(400);
