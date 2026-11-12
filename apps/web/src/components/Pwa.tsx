@@ -89,12 +89,13 @@ export function PwaManager() {
 
   if (!waiting) return null;
   return (
-    <div className="fixed inset-x-0 top-3 z-[80] flex justify-center px-4" role="alert">
-      <div className="flex items-center gap-3 rounded-full bg-coal px-4 py-2 text-sm text-white shadow-lg ring-1 ring-gold/50">
-        <span>A new version of SAHU MUSIC is available.</span>
+    // Phones: just below the top bar (and the status bar), so it covers neither. Larger screens: top centre.
+    <div className="fixed inset-x-0 top-[calc(env(safe-area-inset-top)+4.5rem)] z-[80] flex justify-center px-3 md:top-[calc(env(safe-area-inset-top)+1rem)]" role="alert">
+      <div className="flex w-full max-w-md items-center gap-3 rounded-2xl bg-coal/95 py-2.5 pl-4 pr-2 text-sm text-white shadow-lg ring-1 ring-gold/50 backdrop-blur animate-slide-up">
+        <span className="min-w-0 flex-1 leading-snug">New version of SAHU MUSIC available</span>
         <button
           type="button"
-          className="font-bold text-gold hover:text-gold-soft"
+          className="shrink-0 rounded-full bg-gold px-3.5 py-1.5 text-xs font-bold text-ink hover:bg-gold-soft"
           onClick={() => {
             updateRequested = true;
             waiting.postMessage({ type: 'SKIP_WAITING' });
@@ -102,7 +103,7 @@ export function PwaManager() {
         >
           Update
         </button>
-        <button type="button" className="text-muted hover:text-white" onClick={() => setWaiting(null)} aria-label="Dismiss update notice">
+        <button type="button" className="icon-btn !h-8 !w-8 shrink-0 text-muted hover:text-white" onClick={() => setWaiting(null)} aria-label="Dismiss update notice">
           ✕
         </button>
       </div>

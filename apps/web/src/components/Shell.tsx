@@ -1,9 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { sanitizeQuery } from '@sahu/shared';
 import { useAuth } from '@/lib/auth';
 import { useSongColor } from '@/lib/color';
 import { useOnline } from '@/lib/hooks';
@@ -13,6 +12,7 @@ import { Icon, type IconName } from './icons';
 import { BuiltByBadge, Logo, LogoMark } from './Logo';
 import { FullPlayer, MiniPlayer } from './players';
 import { usePwaInstall } from './Pwa';
+import { QuickSearch } from './QuickSearch';
 import { VideoStage } from './VideoStage';
 
 const NAV: { href: string; label: string; icon: IconName }[] = [
@@ -50,34 +50,6 @@ function InstallButton({ className = '', iconOnly = false }: { className?: strin
   );
 }
 
-/** Top-bar search (tablet and desktop): Enter jumps straight to results. */
-function QuickSearch() {
-  const router = useRouter();
-  const [q, setQ] = useState('');
-  return (
-    <form
-      role="search"
-      className="group relative w-full max-w-md"
-      onSubmit={(e) => {
-        e.preventDefault();
-        const query = sanitizeQuery(q);
-        router.push(query ? `/search/?q=${encodeURIComponent(query)}` : '/search/');
-        setQ('');
-      }}
-    >
-      <Icon name="search" size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted transition group-focus-within:text-gold" />
-      <input
-        type="search"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        maxLength={80}
-        placeholder="Search songs, artists, playlists…"
-        aria-label="Search songs, artists and playlists"
-        className="w-full rounded-full bg-white/[0.06] py-2.5 pl-11 pr-4 text-sm text-white ring-1 ring-white/10 transition placeholder:text-muted focus:bg-white/[0.09] focus:outline-none focus:ring-gold/60"
-      />
-    </form>
-  );
-}
 
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = norm(usePathname() || '/');
@@ -99,7 +71,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const sideLink = 'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-white/65 transition hover:bg-white/[0.06] hover:text-white';
 
   return (
-    <div className="app-backdrop relative flex h-dvh flex-col overflow-hidden md:gap-2 md:p-2">
+    <div className="app-backdrop relative flex h-dvh flex-col overflow-hidden md:gap-2 md:p-2 md:pt-[max(0.5rem,env(safe-area-inset-top))]">
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[90] focus:rounded focus:bg-gold focus:px-3 focus:py-2 focus:text-ink">
         Skip to content
       </a>
@@ -192,12 +164,17 @@ export function Shell({ children }: { children: ReactNode }) {
         </aside>
 
         <main id="main" ref={mainRef} className="main-panel min-w-0 flex-1 overflow-y-auto md:rounded-3xl md:ring-1 md:ring-white/[0.06]" tabIndex={-1}>
-          {/* Phone top bar */}
-          <header className="glass sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-white/[0.05] px-4 py-2.5 md:hidden">
+          {/* Phone top bar: starts below the status bar / notch when the app is drawn edge to edge */}
+          <header className="glass sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-white/[0.05] px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:hidden">
             <Link href="/" aria-label="SAHU MUSIC home, built by Sahil Thakur" className="min-w-0">
               <Logo compact byline />
             </Link>
             <div className="flex shrink-0 items-center">
+              {!pathname.startsWith('/search') && (
+                <Link href="/search/" className="icon-btn text-white/80" aria-label="Search">
+                  <Icon name="search" size={20} />
+                </Link>
+              )}
               <InstallButton iconOnly />
               <Link href="/download" className="icon-btn text-white/80" aria-label="Get the app">
                 <Icon name="download" size={20} />
@@ -250,6 +227,8 @@ export function Shell({ children }: { children: ReactNode }) {
               {music.previewsAllowed && <a href="https://music.apple.com" target="_blank" rel="noopener noreferrer" className="hover:text-white">Previews via Apple Music</a>}
             </div>
           </footer>
+          {/* room to scroll the page out from under the floating YouTube video */}
+          {current?.video && <div className="h-64" aria-hidden="true" />}
         </main>
       </div>
 

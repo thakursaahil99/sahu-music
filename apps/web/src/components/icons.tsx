@@ -15,6 +15,7 @@ const PATHS = {
   plus: 'M12 5v14M5 12h14',
   close: 'M6 6l12 12M18 6 6 18',
   chevronDown: 'M6 9l6 6 6-6',
+  back: 'M19 12H5m6-7-7 7 7 7',
   chevronRight: 'M9 6l6 6-6 6',
   user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm-8 9a8 8 0 0 1 16 0',
   settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM4 12h2m12 0h2M12 4v2m0 12v2M6.3 6.3l1.4 1.4m8.6 8.6 1.4 1.4m0-11.4-1.4 1.4m-8.6 8.6-1.4 1.4',

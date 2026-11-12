@@ -271,15 +271,36 @@ export function QueuePanel() {
   );
 }
 
+/** Marks the history entry the full player adds while it is open. */
+const PLAYER_ENTRY = 'sahuFullPlayer';
+
+/** Leaves the player's history entry (which closes it), or just closes it when there is none. */
+function closeFullPlayer(setFullOpen: (open: boolean) => void) {
+  if (window.history.state?.[PLAYER_ENTRY]) window.history.back();
+  else setFullOpen(false);
+}
+
 /** Full-screen player overlay. */
 export function FullPlayer() {
   const { current, fullOpen, setFullOpen, error, isPlaying, setVideoSlot } = usePlayer();
   const [showQueue, setShowQueue] = useState(false);
   const [menu, setMenu] = useState(false);
 
+  // The phone's Back button / gesture closes the player instead of leaving the page: opening it
+  // adds a history entry for the same address, and going back from that entry closes it.
   useEffect(() => {
     if (!fullOpen) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setFullOpen(false);
+    if (!window.history.state?.[PLAYER_ENTRY]) window.history.pushState({ [PLAYER_ENTRY]: true }, '');
+    const onPop = () => setFullOpen(false);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [fullOpen, setFullOpen]);
+
+  const close = () => closeFullPlayer(setFullOpen);
+
+  useEffect(() => {
+    if (!fullOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeFullPlayer(setFullOpen);
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [fullOpen, setFullOpen]);
@@ -298,11 +319,13 @@ export function FullPlayer() {
         <div className="absolute inset-0 bg-gradient-to-b from-ink/30 via-ink/75 to-ink" />
       </div>
 
-      <header className="relative flex items-center justify-between px-3 pb-1 pt-3 md:px-8">
-        <button type="button" onClick={() => setFullOpen(false)} className="icon-btn bg-white/[0.06] text-white" aria-label="Close player">
-          <Icon name="chevronDown" size={24} />
+      {/* below the status bar / notch when the app is drawn edge to edge */}
+      <header className="relative flex items-center justify-between gap-2 px-3 pb-1 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:px-8">
+        <button type="button" onClick={close} className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-white/[0.08] pl-2.5 pr-3.5 text-sm font-semibold text-white ring-1 ring-white/10 transition hover:bg-white/15 active:scale-95" aria-label="Close player">
+          <Icon name="back" size={20} />
+          <span>Back</span>
         </button>
-        <div className="text-center">
+        <div className="min-w-0 text-center">
           <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/50">Now playing</p>
           <p className="text-xs font-semibold text-white/80">{current.live ? 'Live radio' : current.video ? 'YouTube' : providerName(current.provider)}</p>
         </div>
@@ -316,8 +339,11 @@ export function FullPlayer() {
         </div>
       </header>
 
-      <div className="relative mx-auto flex min-h-0 w-full max-w-6xl flex-1 gap-10 px-5 pb-6 md:px-8">
-        <div className={`min-h-0 flex-1 flex-col items-center justify-center ${showQueue ? 'hidden lg:flex' : 'flex'}`}>
+      <div className="relative mx-auto flex min-h-0 w-full max-w-6xl flex-1 gap-10 px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] md:px-8">
+        {/* min-w-0: a long song title must not push the page wider than the phone.
+            The inner m-auto centres the content, and on short screens lets it scroll instead of being cut off. */}
+        <div className={`no-scrollbar min-h-0 min-w-0 flex-1 flex-col overflow-y-auto ${showQueue ? 'hidden lg:flex' : 'flex'}`}>
+          <div className="m-auto flex w-full flex-col items-center py-2">
           {current.video ? (
             // YouTube's player is drawn over this slot by <VideoStage/> (it must stay visible while it plays)
             <div ref={setVideoSlot} className="aspect-video min-h-[200px] w-full max-w-[min(40rem,52dvh*16/9)]" aria-label="Video" />
@@ -329,7 +355,7 @@ export function FullPlayer() {
 
           <div className="mt-7 flex w-full max-w-xl items-center gap-3">
             <div className="min-w-0 flex-1">
-              <h2 className="truncate text-2xl font-bold text-white md:text-3xl">{current.title}</h2>
+              <h2 className="line-clamp-2 break-words text-xl font-bold leading-tight text-white sm:text-2xl md:text-3xl">{current.title}</h2>
               {current.artistId ? (
                 <Link href={`/artist?p=${current.provider}&id=${current.artistId}`} onClick={() => setFullOpen(false)} className="mt-0.5 block truncate text-sm font-medium text-white/65 hover:text-white">
                   {current.artist}
@@ -363,8 +389,8 @@ export function FullPlayer() {
               <a href={youtubeSearchUrl(current)} target="_blank" rel="noopener noreferrer" className="text-gold hover:text-gold-soft">YouTube</a>
             </p>
           ) : current.video ? (
-            <p className="mt-5 text-center text-[11px] text-white/50">
-              Playing in YouTube&apos;s official player · the video stays on screen and pauses when the app is closed, as YouTube requires
+            <p className="mt-5 max-w-sm text-balance text-center text-[11px] text-white/50">
+              Playing in YouTube&apos;s official player. The video stays on screen and pauses when the app is closed, as YouTube requires.
             </p>
           ) : current.live ? (
             <p className="mt-5 text-center text-[11px] text-white/50">Live broadcast from the station · songs play in full, one after another</p>
@@ -373,6 +399,7 @@ export function FullPlayer() {
               <Icon name="check" size={12} className="text-dyn" /> Full song from <span className="text-white/85">{providerName(current.provider)}</span>
             </p>
           )}
+          </div>
         </div>
 
         <aside className={`min-h-0 w-full flex-col rounded-3xl bg-white/[0.05] p-4 ring-1 ring-white/10 backdrop-blur-xl lg:flex lg:w-[26rem] ${showQueue ? 'flex' : 'hidden'}`}>
