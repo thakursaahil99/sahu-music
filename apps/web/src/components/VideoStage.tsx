@@ -4,6 +4,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { YT_HOST_ID } from '@/lib/engines';
 import { usePlayer } from '@/lib/player';
 import { Icon } from './icons';
+import { youtubeAppUrl } from './tracks';
 
 /**
  * The visible frame for YouTube's official player.
@@ -13,8 +14,9 @@ import { Icon } from './icons';
  * the mini player. The same element moves between the two places, so the video never reloads.
  */
 export function VideoStage() {
-  const { current, fullOpen, videoSlot, setFullOpen, stop } = usePlayer();
+  const { current, fullOpen, videoSlot, setFullOpen, stop, isPlaying, toggle } = usePlayer();
   const video = !!current?.video;
+  const appUrl = current ? youtubeAppUrl(current) : null;
   const [rect, setRect] = useState<DOMRect | null>(null);
 
   // Follow the slot in the full player (it slides in, and moves on resize).
@@ -62,6 +64,12 @@ export function VideoStage() {
         <div className="flex items-center gap-2 bg-black/90 px-3 py-1.5 text-xs text-white/80">
           <span className="rounded bg-[#ff0033] px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">YouTube</span>
           <span className="min-w-0 flex-1 truncate">{current?.title}</span>
+          {appUrl && (
+            // continue in the YouTube app (its own mini window works there); stop the copy here
+            <a href={appUrl} target="_blank" rel="noopener noreferrer" onClick={() => isPlaying && toggle()} className="icon-btn !h-8 !w-8 text-white/80 hover:text-gold" aria-label="Open in YouTube app" title="Open in YouTube app">
+              <Icon name="external" size={16} />
+            </a>
+          )}
           <button type="button" onClick={() => setFullOpen(true)} className="icon-btn !h-8 !w-8 text-white/80 hover:text-gold" aria-label="Open full player">
             <Icon name="chevronDown" size={16} className="rotate-180" />
           </button>

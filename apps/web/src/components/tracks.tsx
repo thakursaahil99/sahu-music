@@ -15,6 +15,20 @@ import { Icon } from './icons';
 export const youtubeSearchUrl = (t: Pick<Track, 'title' | 'artist'>): string =>
   `https://www.youtube.com/results?search_query=${encodeURIComponent(`${t.title} ${t.artist}`)}`;
 
+/**
+ * A YouTube song in the official YouTube app. There, YouTube's own mini window and background
+ * rules apply (YouTube decides when they are available). Android gets an intent link so the app
+ * opens directly instead of a browser tab; elsewhere the youtube.com link, which phones hand to
+ * the app when it is installed.
+ */
+export function youtubeAppUrl(t: Pick<Track, 'video' | 'permalink' | 'providerTrackId'>): string | null {
+  if (!t.video || !t.permalink) return null;
+  if (typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent) && /^[A-Za-z0-9_-]{11}$/.test(t.providerTrackId)) {
+    return `intent://www.youtube.com/watch?v=${t.providerTrackId}#Intent;scheme=https;package=com.google.android.youtube;S.browser_fallback_url=${encodeURIComponent(t.permalink)};end`;
+  }
+  return t.permalink;
+}
+
 /** Live radio station. */
 export function LiveBadge({ className = '' }: { className?: string }) {
   return (

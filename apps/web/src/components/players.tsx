@@ -7,7 +7,7 @@ import { formatDuration } from '@sahu/shared';
 import { usePlayer, useProgress } from '@/lib/player';
 import { Artwork } from './Artwork';
 import { Icon } from './icons';
-import { FavoriteButton, TrackMenu, TrackRow, youtubeSearchUrl } from './tracks';
+import { FavoriteButton, TrackMenu, TrackRow, youtubeAppUrl, youtubeSearchUrl } from './tracks';
 
 /** A song-shaped row of bar heights (%), the same every time for the same track. */
 function waveShape(seed: string, n: number): number[] {
@@ -282,7 +282,7 @@ function closeFullPlayer(setFullOpen: (open: boolean) => void) {
 
 /** Full-screen player overlay. */
 export function FullPlayer() {
-  const { current, fullOpen, setFullOpen, error, isPlaying, setVideoSlot } = usePlayer();
+  const { current, fullOpen, setFullOpen, error, isPlaying, setVideoSlot, toggle } = usePlayer();
   const [showQueue, setShowQueue] = useState(false);
   const [menu, setMenu] = useState(false);
 
@@ -389,9 +389,17 @@ export function FullPlayer() {
               <a href={youtubeSearchUrl(current)} target="_blank" rel="noopener noreferrer" className="text-gold hover:text-gold-soft">YouTube</a>
             </p>
           ) : current.video ? (
-            <p className="mt-5 max-w-sm text-balance text-center text-[11px] text-white/50">
-              Playing in YouTube&apos;s official player. The video stays on screen and pauses when the app is closed, as YouTube requires.
-            </p>
+            <div className="mt-5 flex flex-col items-center gap-2.5">
+              {youtubeAppUrl(current) && (
+                // the song continues in the YouTube app, so it stops here (no two copies playing)
+                <a href={youtubeAppUrl(current)!} target="_blank" rel="noopener noreferrer" onClick={() => isPlaying && toggle()} className="btn-outline !px-4 !py-2 text-sm">
+                  <Icon name="external" size={16} /> Open in YouTube app
+                </a>
+              )}
+              <p className="max-w-sm text-balance text-center text-[11px] text-white/50">
+                Playing in YouTube&apos;s official player. It pauses when you leave this app, as YouTube requires. In the YouTube app, YouTube&apos;s own mini window can keep it going where YouTube offers it.
+              </p>
+            </div>
           ) : current.live ? (
             <p className="mt-5 text-center text-[11px] text-white/50">Live broadcast from the station · songs play in full, one after another</p>
           ) : (
