@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "next build",
+    "build": "node -e \"require('fs').rmSync('.next/cache/fetch-cache',{recursive:true,force:true})\" && next build",
     "start": "npx --yes serve@14 out -l 3000",
     "typecheck": "tsc --noEmit"
   },

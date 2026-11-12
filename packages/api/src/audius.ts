@@ -18,9 +18,21 @@ const idOk = (id: string) => /^[A-Za-z0-9]{1,32}$/.test(id);
 /** How long a search waits for its second ordering after the first one has arrived. */
 const SECOND_ORDER_GRACE_MS = 700;
 
+/** Audius lists other content nodes that hold the same cover; only plain https origins are kept. */
+const mirrorsOf = (art: any): string[] | undefined => {
+  const list = Array.isArray(art?.mirrors) ? art.mirrors.filter((m: unknown): m is string => typeof m === 'string' && /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(m)) : [];
+  return list.length ? list.slice(0, 4) : undefined;
+};
+
 export interface AudiusOptions {
   appName?: string;
   baseUrl?: string;
+  /**
+   * Request timeout and retries. The defaults suit a listener waiting (6 s, one retry); a site
+   * build can afford to be patient.
+   */
+  timeoutMs?: number;
+  retries?: number;
 }
 
 /**
@@ -35,10 +47,16 @@ export class AudiusProvider implements MusicProvider {
   private readonly base: string;
   private readonly app: string;
   private readonly limiter = new RateLimiter(20, 5_000);
+  private readonly timeoutMs: number;
+  private readonly retries: number;
 
   constructor(opts: AudiusOptions = {}) {
     this.base = (opts.baseUrl || 'https://api.audius.co/v1').replace(/\/$/, '');
     this.app = encodeURIComponent(opts.appName || 'SAHU_MUSIC');
+    // Audius answers in about a second; a request that hangs is retried once instead of being
+    // waited on for the default 12 s (twice).
+    this.timeoutMs = opts.timeoutMs ?? 6_000;
+    this.retries = opts.retries ?? 1;
   }
 
   isConfigured(): boolean {
@@ -57,10 +75,8 @@ export class AudiusProvider implements MusicProvider {
     const json = await fetchJson<{ data?: unknown }>(this.url(path, params), {
       provider: this.id,
       limiter: this.limiter,
-      // Audius answers in about a second; a request that hangs is retried once instead of
-      // being waited on for the default 12 s (twice).
-      timeoutMs: 6_000,
-      retries: 1,
+      timeoutMs: this.timeoutMs,
+      retries: this.retries,
     });
     return json?.data ?? null;
   }
@@ -92,6 +108,7 @@ export class AudiusProvider implements MusicProvider {
       artistId: typeof t.user?.id === 'string' ? t.user.id : undefined,
       artwork: t.artwork?.['480x480'] || t.artwork?.['150x150'] || null,
       artworkLarge: t.artwork?.['1000x1000'] || t.artwork?.['480x480'] || null,
+      artworkMirrors: mirrorsOf(t.artwork),
       streamUrl: rights.streamingPermitted ? this.streamUrl(t.id) : '',
       duration: Number(t.duration) || 0,
       genre: t.genre || null,
@@ -129,6 +146,7 @@ export class AudiusProvider implements MusicProvider {
       title: p.playlist_name || 'Untitled',
       description: p.description || null,
       artwork: p.artwork?.['480x480'] || p.artwork?.['150x150'] || null,
+      artworkMirrors: mirrorsOf(p.artwork),
       ownerName: p.user?.name || p.user?.handle || 'Unknown',
       ownerId: typeof p.user?.id === 'string' ? p.user.id : undefined,
       trackCount: Number(p.track_count) || 0,

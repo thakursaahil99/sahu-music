@@ -20,7 +20,7 @@ function TopResult({ track, list }: { track: Track; list: Track[] }) {
   const active = !!current && trackKey(current) === trackKey(track);
   return (
     <div {...intent} className="group relative overflow-hidden rounded-3xl bg-white/[0.04] p-5 ring-1 ring-white/[0.07] transition hover:bg-white/[0.07]">
-      <Artwork src={track.artwork} alt="" rounded="rounded-2xl" className="h-28 w-28 shadow-lift" />
+      <Artwork mirrors={track.artworkMirrors} src={track.artwork} alt="" rounded="rounded-2xl" className="h-28 w-28 shadow-lift" />
       <p className={`mt-4 line-clamp-2 font-display text-2xl font-bold leading-tight ${active ? 'text-dyn' : 'text-white'}`}>{track.title}</p>
       <p className="mt-1 truncate text-sm text-white/60">
         <span className="mr-2 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white/80">{track.live ? 'Live' : 'Song'}</span>

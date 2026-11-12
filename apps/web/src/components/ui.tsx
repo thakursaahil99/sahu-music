@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Artist, Collection } from '@sahu/models';
 import { formatCount, type Category } from '@sahu/shared';
-import { readLocal, writeLocal } from '@/lib/hooks';
 import { useSettings } from '@/lib/settings';
 import { Artwork } from './Artwork';
 import { Icon, type IconName } from './icons';
@@ -149,7 +149,7 @@ export function LazyMount({ children, minHeight = 240 }: { children: ReactNode; 
           io.disconnect();
         }
       },
-      { rootMargin: '300px' },
+      { rootMargin: '900px' },
     );
     io.observe(el);
     return () => io.disconnect();
@@ -163,49 +163,51 @@ export function LazyMount({ children, minHeight = 240 }: { children: ReactNode; 
 
 /* ── Category photos ──────────────────────────────────────────────
  * A tile shows cover art from the category's own live tracks (never stock images).
- * The covers are picked once while the site is built (app/category-art.json/route.ts) and
- * read from that one small file: opening a page with twenty tiles costs no music-server
- * requests, so the listener's own search is never queued behind them. */
-const ART_KEY = 'sahu.category-art.v2';
-let artFile: Promise<Record<string, string>> | null = null;
+ * The covers are picked once while the site is built (lib/catalogue-build.ts) and written into
+ * every page by the root layout, so the photos are in the HTML and start loading with it: no
+ * extra file, no music-server requests from the visitor's browser. */
+const ArtCtx = createContext<Record<string, string>>({});
 
-function categoryArt(): Promise<Record<string, string>> {
-  artFile ??= fetch('/category-art.json')
-    .then((r) => (r.ok ? r.json() : null))
-    .then((j: { art?: Record<string, string> } | null) => {
-      const art = j?.art ?? {};
-      if (Object.keys(art).length) writeLocal(ART_KEY, art);
-      return Object.keys(art).length ? art : readLocal<Record<string, string>>(ART_KEY, {});
-    })
-    .catch(() => readLocal<Record<string, string>>(ART_KEY, {}));
-  return artFile;
+export function CategoryArtProvider({ art, children }: { art: Record<string, string>; children: ReactNode }) {
+  return <ArtCtx.Provider value={art}>{children}</ArtCtx.Provider>;
 }
 
-// `ref` is kept for callers; the covers no longer depend on scrolling into view.
-export function useCategoryArt(category: Category, _ref?: React.RefObject<HTMLElement | null>): string | null {
-  const [url, setUrl] = useState<string | null>(null);
+export function useCategoryArt(category: Category): string | null {
+  return useContext(ArtCtx)[category.slug] ?? null;
+}
+
+/**
+ * True once `src` has loaded. Also catches an image that finished loading before React was
+ * ready (pages arrive as HTML, so the browser can be faster than the onLoad handler).
+ */
+export function useImageLoaded(src: string | null | undefined) {
+  const ref = useRef<HTMLImageElement>(null);
+  const [loaded, setLoaded] = useState(false);
   useEffect(() => {
-    let alive = true;
-    const kept = readLocal<Record<string, string>>(ART_KEY, {})[category.slug];
-    if (kept) setUrl(kept);
-    void categoryArt().then((art) => alive && setUrl(art[category.slug] ?? kept ?? null));
-    return () => {
-      alive = false;
-    };
-  }, [category.slug]);
-  return url;
+    const img = ref.current;
+    setLoaded(!!img && img.complete && img.naturalWidth > 0);
+  }, [src]);
+  return { ref, loaded, onLoad: () => setLoaded(true), onError: () => setLoaded(false) };
 }
 
 export function CategoryTile({ category }: { category: Category }) {
-  const ref = useRef<HTMLAnchorElement>(null);
+  const router = useRouter();
   const { settings } = useSettings();
-  const art = useCategoryArt(category, ref);
-  const [loaded, setLoaded] = useState(false);
+  const art = useCategoryArt(category);
   const src = art && settings.dataSaver ? art.replace(/(480x480|1000x1000)(\.jpg)/, '150x150$2') : art;
+  const img = useImageLoaded(src);
+  const loaded = img.loaded;
+  const href = `/genre/${category.slug}`;
+  // The category page carries its first songs, so it is fetched when the listener shows interest
+  // (pointer or finger on the tile) rather than for every tile on screen.
+  const prefetch = () => router.prefetch(href);
   return (
     <Link
-      ref={ref}
-      href={`/genre/${category.slug}`}
+      href={href}
+      prefetch={false}
+      onPointerEnter={prefetch}
+      onPointerDown={prefetch}
+      onFocus={prefetch}
       className="card-lift sheen group relative flex h-24 items-start overflow-hidden rounded-2xl p-3.5 ring-1 ring-white/10 transition hover:shadow-lift hover:ring-white/30 xs:h-28 md:h-32 md:p-4"
       style={{
         background: `radial-gradient(120% 90% at 0% 0%, rgba(255,255,255,0.18), transparent 55%), linear-gradient(140deg, ${category.tint[0]} 0%, color-mix(in srgb, ${category.tint[0]} 38%, #0a0a0a) 100%)`,
@@ -214,12 +216,12 @@ export function CategoryTile({ category }: { category: Category }) {
       {src && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
+          ref={img.ref}
           src={src}
           alt=""
-          loading="lazy"
           decoding="async"
-          onLoad={() => setLoaded(true)}
-          onError={() => setLoaded(false)}
+          onLoad={img.onLoad}
+          onError={img.onError}
           className={`absolute inset-y-0 right-0 h-full w-[64%] object-cover transition duration-700 group-hover:scale-110 ${loaded ? 'opacity-100' : 'opacity-0'}`}
           style={{ maskImage: 'linear-gradient(to right, transparent 0%, #000 70%)', WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 70%)' }}
         />
@@ -251,7 +253,7 @@ export function CollectionCard({ collection }: { collection: Collection }) {
   const path = collection.kind === 'album' ? 'album' : 'playlist';
   return (
     <Link href={`/${path}?p=${collection.provider}&id=${collection.providerCollectionId}`} className="card-lift group w-[9.25rem] shrink-0 snap-start xs:w-40 md:w-44 lg:w-48">
-      <Artwork src={collection.artwork} alt={collection.title} rounded="rounded-2xl" className="art-zoom shadow-lift ring-1 ring-white/[0.06]" />
+      <Artwork mirrors={collection.artworkMirrors} src={collection.artwork} alt={collection.title} rounded="rounded-2xl" className="art-zoom shadow-lift ring-1 ring-white/[0.06]" />
       <p className="mt-2.5 truncate text-[13.5px] font-semibold text-white">{collection.title}</p>
       <p className="truncate text-xs text-white/55">
         {collection.kind === 'album' ? 'Album' : 'Playlist'} · {collection.ownerName}

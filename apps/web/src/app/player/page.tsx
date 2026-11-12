@@ -24,7 +24,7 @@ export default function PlayerPage() {
       <h1 className="mb-6 text-3xl font-extrabold text-white">Now playing</h1>
       <div className="grid gap-8 lg:grid-cols-[20rem,1fr]">
         <div>
-          <Artwork src={current.artworkLarge || current.artwork} alt={`${current.title} artwork`} size="lg" rounded="rounded-2xl" className="shadow-glow" />
+          <Artwork mirrors={current.artworkMirrors} src={current.artworkLarge || current.artwork} alt={`${current.title} artwork`} size="lg" rounded="rounded-2xl" className="shadow-glow" />
           <h2 className="mt-4 truncate text-xl font-bold text-white">{current.title}</h2>
           <p className="truncate text-sm text-muted">{current.artist}</p>
           <div className="mt-4 flex gap-3">

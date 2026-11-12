@@ -14,6 +14,7 @@ import { useAsync } from '@/lib/hooks';
 import { useLibrary } from '@/lib/library';
 import { music, visibleCategories, youtubeEnabled } from '@/lib/music';
 import { usePlayer } from '@/lib/player';
+import { HOME_RADIO_ROW, HOME_ROW_SIZE, HOME_ROWS } from '@/lib/home-rows';
 import type { HomeSnapshot } from '@/lib/snapshot';
 
 /** Keep a home row for the next visit only when it holds real music (not empty, not the demo fallback). */
@@ -22,9 +23,14 @@ const keepRow = (rows: unknown[]) => rows.length > 0 && !music.isDemoMode();
 /** Quick moods under the hero. */
 const MOODS = ['hindi', 'punjabi', 'romantic', 'bhakti-radio', 'lofi-hindi', 'old-hindi', 'party', 'sad', 'haryanvi', 'ghazal-qawwali'];
 
-function CategoryRow({ slug, initial }: { slug: string; initial?: { at: number; data: Track[] } | null }) {
+function CategoryRow({ slug, initial, refreshDelayMs }: { slug: string; initial?: { at: number; data: Track[] } | null; refreshDelayMs?: number }) {
   const cat = getCategory(slug)!;
-  const { data, loading, error, reload } = useAsync(() => music.getCategoryTracks(cat.strategy, { limit: 12 }), [slug], { key: `home:${slug}`, keep: keepRow, initial });
+  const { data, loading, error, reload } = useAsync(() => music.getCategoryTracks(cat.strategy, { limit: HOME_ROW_SIZE }), [slug], {
+    key: `home:${slug}`,
+    keep: keepRow,
+    initial,
+    refreshDelayMs,
+  });
   if (!loading && !error && (data?.length ?? 0) === 0) return null; // nothing real to show → show nothing
   return (
     <Section title={cat.name} subtitle={cat.blurb} href={`/genre/${cat.slug}`}>
@@ -53,7 +59,7 @@ function ChartLine({ track, rank, list }: { track: Track; rank: number; list: Tr
       className={`group flex w-full items-center gap-3 rounded-2xl p-1.5 pr-3 text-left transition hover:bg-white/[0.07] ${active ? 'bg-white/[0.08]' : ''}`}
     >
       <span className="w-5 shrink-0 text-center font-display text-lg font-bold text-white/40">{rank}</span>
-      <Artwork src={track.artwork} alt="" size="sm" rounded="rounded-xl" className="h-12 w-12 shrink-0" />
+      <Artwork mirrors={track.artworkMirrors} src={track.artwork} alt="" size="sm" rounded="rounded-xl" className="h-12 w-12 shrink-0" />
       <span className="min-w-0 flex-1">
         <span className={`block truncate text-sm font-semibold ${active ? 'text-dyn' : 'text-white'}`}>{track.title}</span>
         <span className="block truncate text-xs text-white/55">{track.artist}</span>
@@ -157,11 +163,18 @@ function MoodChips() {
 export function HomeView({ snapshot }: { snapshot: HomeSnapshot | null }) {
   const { history } = useLibrary();
   const at = snapshot?.at ?? 0;
-  const trending = useAsync(() => music.getHindiHits(20), [], { key: 'home:hindi-hits', keep: keepRow, initial: snapshot?.hits.length ? { at, data: snapshot.hits } : null });
+  const built = (slug: string) => (snapshot?.rows[slug]?.length ? { at, data: snapshot.rows[slug] } : null);
+  const trending = useAsync(() => music.getHindiHits(20), [], {
+    key: 'home:hindi-hits',
+    keep: keepRow,
+    initial: snapshot?.hits.length ? { at, data: snapshot.hits } : null,
+    refreshDelayMs: 1500,
+  });
   const playlists = useAsync(() => music.getTrendingCollections({ limit: 12 }), [], {
     key: 'home:playlists',
     keep: keepRow,
     initial: snapshot?.playlists.length ? { at, data: snapshot.playlists as Collection[] } : null,
+    refreshDelayMs: 4000,
   });
   const verified = useAsync(() => fetchVerifiedSongs(20), []);
   const recent = history.slice(0, 8).map((h) => h.track);
@@ -197,7 +210,7 @@ export function HomeView({ snapshot }: { snapshot: HomeSnapshot | null }) {
 
       {/* original film songs (YouTube official player) and live Bollywood radio come right after the Hindi hits */}
       {youtubeEnabled && <CategoryRow slug="bollywood-top" />}
-      <CategoryRow slug="bollywood-radio" initial={snapshot?.radio.length ? { at, data: snapshot.radio } : null} />
+      <CategoryRow slug={HOME_RADIO_ROW} initial={built(HOME_RADIO_ROW)} refreshDelayMs={2500} />
 
       <Section title="Browse categories" href="/explore">
         <div className="stagger grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:gap-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -223,11 +236,14 @@ export function HomeView({ snapshot }: { snapshot: HomeSnapshot | null }) {
         )}
       </Section>
 
-      {['bollywood', 'retro-radio', 'punjabi', 'old-hindi', 'devotional', 'bhakti-radio', 'romantic', 'lofi-hindi', 'independent-artists'].map((slug) => (
-        <LazyMount key={slug}>
-          <CategoryRow slug={slug} />
-        </LazyMount>
-      ))}
+      {/* Rows built into the page show at once (scrolling never waits); if one is old it is
+          refreshed in the background, one row after another. Rows without built data load as
+          they come near the screen. */}
+      {HOME_ROWS.map((slug, i) => {
+        const seed = built(slug);
+        const row = <CategoryRow slug={slug} initial={seed} refreshDelayMs={5000 + i * 2500} />;
+        return seed ? <div key={slug}>{row}</div> : <LazyMount key={slug}>{row}</LazyMount>;
+      })}
     </>
   );
 }

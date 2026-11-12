@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { BUILT_FRESH_MS } from './home-rows';
 
 export interface AsyncState<T> {
   data: T | null;
@@ -16,14 +17,20 @@ export interface AsyncCache<T> {
   keep?: (data: T) => boolean;
   /**
    * An answer written into the page when the site was built. It is on screen from the very first
-   * paint (also in the server HTML) and is always refreshed in the background.
+   * paint (also in the server HTML); it is refreshed in the background only once it is older
+   * than BUILT_FRESH_MS.
    */
   initial?: { at: number; data: T } | null;
+  /**
+   * Wait this long before refreshing an answer that is already on screen, so the rows of a page
+   * refresh one after another instead of all asking the music servers at the same moment.
+   */
+  refreshDelayMs?: number;
 }
 
 const CACHE_PREFIX = 'sahu:rows:v1:';
 /** A kept answer newer than this is shown as is, with no request. */
-const CACHE_FRESH_MS = 10 * 60_000;
+const CACHE_FRESH_MS = 30 * 60_000;
 /** A kept answer older than this is not shown at all. */
 const CACHE_MAX_AGE_MS = 24 * 60 * 60_000;
 
@@ -53,27 +60,31 @@ export function useAsync<T>(loader: () => Promise<T>, deps: unknown[], cache?: A
     if (seed) {
       setData(seed.data);
       setLoading(false);
-      if (age < CACHE_FRESH_MS && tick === 0) return;
+      if (age < (seed === built ? BUILT_FRESH_MS : CACHE_FRESH_MS) && tick === 0) return;
     } else {
       setLoading(true);
     }
-    loaderRef.current().then(
-      (d) => {
-        if (!alive) return;
-        // an unchanged answer is not set again, so a row already on screen does not re-render
-        if (shown === null || JSON.stringify(d) !== shown) setData(d);
-        setLoading(false);
-        if (store && (store.keep?.(d) ?? true)) writeLocal(storeKey, { at: Date.now(), data: d });
-      },
-      (e) => {
-        if (!alive) return;
-        // with a kept answer on screen, a failed refresh is not worth an error message
-        if (shown === null) setError(e instanceof Error ? e.message : 'Something went wrong.');
-        setLoading(false);
-      },
-    );
+    const run = () =>
+      loaderRef.current().then(
+        (d) => {
+          if (!alive) return;
+          // an unchanged answer is not set again, so a row already on screen does not re-render
+          if (shown === null || JSON.stringify(d) !== shown) setData(d);
+          setLoading(false);
+          if (store && (store.keep?.(d) ?? true)) writeLocal(storeKey, { at: Date.now(), data: d });
+        },
+        (e) => {
+          if (!alive) return;
+          // with a kept answer on screen, a failed refresh is not worth an error message
+          if (shown === null) setError(e instanceof Error ? e.message : 'Something went wrong.');
+          setLoading(false);
+        },
+      );
+    const wait = seed && tick === 0 ? (store?.refreshDelayMs ?? 0) : 0;
+    const timer = wait > 0 ? setTimeout(run, wait) : (run(), undefined);
     return () => {
       alive = false;
+      clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, tick]);
@@ -108,23 +119,51 @@ export function usePaged<T>(
   keyOf: (item: T) => string,
   deps: unknown[],
   pageSize = 20,
+  /**
+   * The first page written into the page when the site was built (for the first `deps` only).
+   * Shown from the first paint; refreshed in the background once older than BUILT_FRESH_MS.
+   */
+  initial?: { at: number; items: T[] } | null,
 ): PagedState<T> {
-  const [items, setItems] = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
+  const built = initial?.items.length ? initial : null;
+  const [items, setItems] = useState<T[]>(() => built?.items ?? []);
+  const [loading, setLoading] = useState(!built);
   const [refining, setRefining] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
+  const [hasMore, setHasMore] = useState(() => !!built && built.items.length >= Math.ceil(pageSize / 2));
   const [tick, setTick] = useState(0);
   const fetchRef = useRef(fetchPage);
   fetchRef.current = fetchPage;
   const keyRef = useRef(keyOf);
   keyRef.current = keyOf;
-  const offsetRef = useRef(0);
+  const offsetRef = useRef(built?.items.length ?? 0);
   const runRef = useRef(0);
+  const builtRef = useRef(built);
+  const builtDeps = useRef(JSON.stringify(deps));
 
   useEffect(() => {
     const run = ++runRef.current;
+    const seed = builtRef.current;
+    if (seed && tick === 0 && JSON.stringify(deps) === builtDeps.current) {
+      // the built page is on screen already
+      offsetRef.current = seed.items.length;
+      setItems(seed.items);
+      setLoading(false);
+      setHasMore(seed.items.length >= Math.ceil(pageSize / 2));
+      if (Date.now() - seed.at < BUILT_FRESH_MS) return;
+      // old: refresh the first page quietly, keeping the built one on screen meanwhile
+      fetchRef.current(0, pageSize).then(
+        (page) => {
+          if (run !== runRef.current || page.length === 0) return;
+          offsetRef.current = pageSize;
+          setItems(page);
+          setHasMore(page.length >= Math.ceil(pageSize / 2));
+        },
+        () => undefined,
+      );
+      return;
+    }
     offsetRef.current = 0;
     setLoading(true);
     setError(null);

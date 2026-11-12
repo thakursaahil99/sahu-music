@@ -41,6 +41,11 @@ export interface Track {
   artistId?: string;
   artwork: string | null;
   artworkLarge?: string | null;
+  /**
+   * Other servers holding the same cover (origins, e.g. "https://node.example"). The cover's path
+   * is the same on each; the app tries them in order when the main one fails.
+   */
+  artworkMirrors?: string[];
   streamUrl: string;
   /** seconds (for a preview clip: the length of the clip, not of the full song) */
   duration: number;
@@ -93,6 +98,8 @@ export interface Collection {
   title: string;
   description?: string | null;
   artwork: string | null;
+  /** Other servers holding the same cover (see Track.artworkMirrors). */
+  artworkMirrors?: string[];
   ownerName: string;
   ownerId?: string;
   trackCount: number;

@@ -119,7 +119,7 @@ export function TrackCard({ track, list, index }: { track: Track; list: Track[];
   return (
     <div {...intent} className={`card-lift group w-[9.25rem] shrink-0 snap-start xs:w-40 md:w-44 lg:w-48 ${unavailable ? 'opacity-50' : ''}`}>
       <div className="relative">
-        <Artwork src={track.artwork} alt={`${track.title} artwork`} rounded="rounded-2xl" className={`art-zoom shadow-lift ${active ? 'ring-2 ring-dyn' : 'ring-1 ring-white/[0.06]'}`} />
+        <Artwork mirrors={track.artworkMirrors} src={track.artwork} alt={`${track.title} artwork`} rounded="rounded-2xl" className={`art-zoom shadow-lift ${active ? 'ring-2 ring-dyn' : 'ring-1 ring-white/[0.06]'}`} />
         <button
           type="button"
           onClick={() => (active ? toggle() : playQueue(list, index))}
@@ -169,7 +169,7 @@ export function QuickTile({ track, list, index }: { track: Track; list: Track[];
       aria-label={active && isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
       className={`surface surface-hover group flex items-center gap-3 overflow-hidden rounded-2xl p-1.5 pr-3 text-left ${active ? '!bg-white/[0.08] !ring-dyn/50' : ''} ${unavailable ? 'opacity-50' : ''}`}
     >
-      <Artwork src={track.artwork} alt="" size="sm" rounded="rounded-xl" className="h-12 w-12 shrink-0 md:h-14 md:w-14" />
+      <Artwork mirrors={track.artworkMirrors} src={track.artwork} alt="" size="sm" rounded="rounded-xl" className="h-12 w-12 shrink-0 md:h-14 md:w-14" />
       <span className="min-w-0 flex-1">
         <span className={`block truncate text-sm font-semibold ${active ? 'text-dyn' : 'text-white'}`}>{track.title}</span>
         <span className="block truncate text-xs text-white/55">{track.artist}</span>
@@ -213,7 +213,7 @@ export function TrackRow({
         </span>
       )}
       <button type="button" onClick={play} className="relative shrink-0" aria-label={active && isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}>
-        <Artwork src={track.artwork} alt="" size="sm" rounded="rounded-xl" className="h-12 w-12" />
+        <Artwork mirrors={track.artworkMirrors} src={track.artwork} alt="" size="sm" rounded="rounded-xl" className="h-12 w-12" />
         <span className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/50 text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100">
           <Icon name={active && isPlaying ? 'pause' : 'play'} size={18} />
         </span>
@@ -311,7 +311,7 @@ export function TrackMenu({ track, onClose }: { track: Track; onClose: () => voi
       <div className="max-h-[80dvh] w-full max-w-md animate-slide-up overflow-y-auto rounded-t-3xl bg-coal p-3 pb-[max(env(safe-area-inset-bottom),12px)] ring-1 ring-white/10 sm:animate-pop-in sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
         <span className="mx-auto mb-2 block h-1 w-10 rounded-full bg-white/20 sm:hidden" aria-hidden="true" />
         <div className="mb-2 flex items-center gap-3 border-b border-coal-line p-2 pb-3">
-          <Artwork src={track.artwork} alt="" size="sm" rounded="rounded-md" className="h-12 w-12" />
+          <Artwork mirrors={track.artworkMirrors} src={track.artwork} alt="" size="sm" rounded="rounded-md" className="h-12 w-12" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-white">{track.title}</p>
             <p className="truncate text-xs text-muted">{track.artist}</p>

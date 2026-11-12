@@ -178,7 +178,7 @@ export function MiniPlayer() {
         {/* phones */}
         <div className="flex items-center gap-3 py-2 pl-2 pr-1.5 md:hidden">
           <button type="button" onClick={() => setFullOpen(true)} className="flex min-w-0 flex-1 items-center gap-3 text-left" aria-label="Open full player">
-            <Artwork src={current.artwork} alt="" size="sm" rounded="rounded-xl" className={`h-11 w-11 shrink-0 ${isPlaying ? 'shadow-glow' : ''}`} />
+            <Artwork mirrors={current.artworkMirrors} src={current.artwork} alt="" size="sm" rounded="rounded-xl" className={`h-11 w-11 shrink-0 ${isPlaying ? 'shadow-glow' : ''}`} />
             <span className="min-w-0">
               <span className="block truncate text-sm font-bold text-white">{current.title}</span>
               <SubLine track={current} error={error} />
@@ -195,7 +195,7 @@ export function MiniPlayer() {
         <div className="hidden items-center gap-4 px-4 py-3 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_auto] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1fr)] lg:gap-6 lg:px-5">
           <div className="flex min-w-0 items-center gap-3">
             <button type="button" onClick={() => setFullOpen(true)} className="group relative shrink-0" aria-label="Open full player">
-              <Artwork src={current.artwork} alt="" size="sm" rounded="rounded-2xl" className={`h-14 w-14 ring-1 ring-white/10 transition ${isPlaying ? 'shadow-glow' : ''}`} />
+              <Artwork mirrors={current.artworkMirrors} src={current.artwork} alt="" size="sm" rounded="rounded-2xl" className={`h-14 w-14 ring-1 ring-white/10 transition ${isPlaying ? 'shadow-glow' : ''}`} />
               <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/50 text-white opacity-0 transition group-hover:opacity-100">
                 <Icon name="chevronDown" size={20} className="rotate-180" />
               </span>
@@ -323,7 +323,7 @@ export function FullPlayer() {
             <div ref={setVideoSlot} className="aspect-video min-h-[200px] w-full max-w-[min(40rem,52dvh*16/9)]" aria-label="Video" />
           ) : (
             <div className={`relative w-full max-w-[min(24rem,44dvh)] transition-transform duration-700 md:max-w-[min(27rem,48dvh)] ${isPlaying ? 'animate-breathe' : 'scale-[0.95]'}`}>
-              <Artwork src={current.artworkLarge || current.artwork} alt={`${current.title} artwork`} size="lg" rounded="rounded-[28px]" className={`ring-1 ring-white/10 transition-shadow duration-700 ${isPlaying ? 'shadow-glow-lg' : 'shadow-lift'}`} />
+              <Artwork mirrors={current.artworkMirrors} src={current.artworkLarge || current.artwork} alt={`${current.title} artwork`} size="lg" rounded="rounded-[28px]" className={`ring-1 ring-white/10 transition-shadow duration-700 ${isPlaying ? 'shadow-glow-lg' : 'shadow-lift'}`} />
             </div>
           )}
 

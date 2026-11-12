@@ -11,12 +11,13 @@ import { usePaged } from '@/lib/hooks';
 import { music, youtubeEnabled } from '@/lib/music';
 import { usePlayer } from '@/lib/player';
 
-export function GenreView({ slug }: { slug: string }) {
+export function GenreView({ slug, initial }: { slug: string; initial?: { at: number; items: Track[] } | null }) {
   const cat = getCategory(slug)!;
   const { playQueue } = usePlayer();
-  const list = usePaged<Track>((offset, limit) => music.getCategoryTracks(cat.strategy, { offset, limit }), trackKey, [slug], 20);
+  // the first page was written into this page when the site was built
+  const list = usePaged<Track>((offset, limit) => music.getCategoryTracks(cat.strategy, { offset, limit }), trackKey, [slug], 20, initial);
   const headerRef = useRef<HTMLElement>(null);
-  const cachedArt = useCategoryArt(cat, headerRef);
+  const cachedArt = useCategoryArt(cat);
   const cover = cachedArt ?? list.items.find((t) => t.artwork)?.artworkLarge ?? list.items.find((t) => t.artwork)?.artwork ?? null;
 
   const how =

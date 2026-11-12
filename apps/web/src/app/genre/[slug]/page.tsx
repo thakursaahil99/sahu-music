@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { CATEGORIES, getCategory } from '@sahu/shared';
+import { getCatalogue } from '@/lib/catalogue-build';
 import { GenreView } from './GenreView';
 
 export function generateStaticParams() {
@@ -18,5 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function GenrePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   if (!getCategory(slug)) notFound();
-  return <GenreView slug={slug} />;
+  const catalogue = await getCatalogue();
+  const first = catalogue?.rows[slug];
+  return <GenreView slug={slug} initial={first?.length ? { at: catalogue!.at, items: first } : null} />;
 }

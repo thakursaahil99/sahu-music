@@ -250,6 +250,8 @@ try {
   await check('live Bollywood radio station plays', async () => {
     await cdp('Page.navigate', { url: `${site}/genre/bollywood-radio/` });
     await waitFor(`${cardBtn}.length`, 'radio stations', 30000);
+    // the stations are in the page's HTML: wait until React has taken over the buttons
+    await waitFor(`Object.keys(${cardBtn}[0]).some((k) => k.startsWith('__reactProps'))`, 'the page to become interactive', 30000);
     const live = await js('[...document.querySelectorAll("span")].some((s) => s.textContent.trim() === "Live")');
     if (!live) throw new Error('no LIVE badge on the radio page');
     await js(`${cardBtn}[0].click()`);

@@ -71,6 +71,8 @@ export interface MusicServiceConfig {
   /** Openly licensed audio from the Internet Archive. Default on. */
   archive?: boolean;
   forceDemo?: boolean;
+  /** Nobody is waiting (building the site): long timeouts and more retries instead of quick answers. */
+  patient?: boolean;
   /** Extra providers (modular architecture – plug in more authorised sources here). */
   extraProviders?: MusicProvider[];
 }
@@ -102,7 +104,7 @@ export class MusicService {
   constructor(private readonly cfg: MusicServiceConfig = {}) {
     this.previewsAllowed = cfg.itunesPreviews === true;
     this.providers = [
-      new AudiusProvider({ appName: cfg.audiusAppName }),
+      new AudiusProvider({ appName: cfg.audiusAppName, ...(cfg.patient ? { timeoutMs: 20_000, retries: 3 } : {}) }),
       new JamendoProvider(cfg.jamendoClientId),
       new ItunesProvider({ enabled: cfg.itunesPreviews === true, country: cfg.itunesCountry }),
       new YoutubeProvider({ apiKey: cfg.youtubeApiKey, region: cfg.youtubeRegion }),

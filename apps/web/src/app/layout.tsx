@@ -3,6 +3,7 @@ import { Outfit, Plus_Jakarta_Sans } from 'next/font/google';
 import type { ReactNode } from 'react';
 import { Providers } from '@/components/Providers';
 import { Shell } from '@/components/Shell';
+import { getCatalogue } from '@/lib/catalogue-build';
 import { env } from '@/lib/config';
 import './globals.css';
 
@@ -44,7 +45,9 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // category covers, picked while the site is built: in every page's HTML, so tiles show photos at once
+  const art = (await getCatalogue())?.art ?? {};
   return (
     <html lang="en" className={`${sans.variable} ${display.variable}`}>
       <head>
@@ -57,7 +60,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <link rel="dns-prefetch" href="https://de1.api.radio-browser.info" />
       </head>
       <body className="font-sans antialiased">
-        <Providers>
+        <Providers art={art}>
           <Shell>{children}</Shell>
         </Providers>
       </body>

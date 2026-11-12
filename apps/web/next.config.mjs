@@ -8,6 +8,11 @@ const nextConfig = {
   images: { unoptimized: true },
   transpilePackages: ['@sahu/api', '@sahu/models', '@sahu/shared'],
   reactStrictMode: true,
+  experimental: {
+    // Pages are generated in ONE worker, so the music catalogue written into them
+    // (src/lib/catalogue-build.ts) is fetched once per build instead of once per worker.
+    cpus: 1,
+  },
 };
 
 // `next dev` and `next build` must not share an output folder: a build that runs while

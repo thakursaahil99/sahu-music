@@ -167,6 +167,17 @@ describe('MusicService', () => {
     expect(searches.every((u) => u.includes('sort_method=popular'))).toBe(true);
   });
 
+  it('keeps the cover mirrors Audius lists (plain https servers only)', async () => {
+    const artwork = {
+      '480x480': 'https://node-a.example/content/abc/480x480.jpg',
+      mirrors: ['https://node-b.example', 'http://insecure.example', 'https://node-c.example/path', 'javascript:alert(1)', 'https://node-d.example'],
+    };
+    vi.stubGlobal('fetch', vi.fn(async () => respond([track('a1', { artwork })])));
+    const [t] = await createMusicService({ radio: false, archive: false }).getTrending();
+    expect(t.artwork).toBe('https://node-a.example/content/abc/480x480.jpg');
+    expect(t.artworkMirrors).toEqual(['https://node-b.example', 'https://node-d.example']);
+  });
+
   it('reports Jamendo as not configured without a client id', () => {
     const jamendo = createMusicService().status().find((p) => p.id === 'jamendo')!;
     expect(jamendo.configured).toBe(false);
