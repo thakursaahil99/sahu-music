@@ -149,7 +149,7 @@ function Hero({ hits, loading }: { hits: Track[] | null; loading: boolean }) {
 function MoodChips() {
   const moods = MOODS.map((s) => visibleCategories.find((c) => c.slug === s)).filter((c): c is NonNullable<typeof c> => !!c);
   return (
-    <nav aria-label="Moods" className="no-scrollbar -mx-4 mb-8 flex gap-2 overflow-x-auto px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+    <nav aria-label="Moods" className="no-scrollbar swipe-fade -mx-4 mb-8 flex gap-2 overflow-x-auto px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
       {moods.map((c) => (
         <Link key={c.slug} href={`/genre/${c.slug}`} className="chip">
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: c.tint[0], boxShadow: `0 0 10px ${c.tint[0]}` }} aria-hidden="true" />

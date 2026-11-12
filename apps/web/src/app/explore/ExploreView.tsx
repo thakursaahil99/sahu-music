@@ -48,7 +48,7 @@ export function ExploreView({ built }: { built?: { at: number; chart: Track[]; p
       </Section>
 
       <Section title="Charts by genre" subtitle="Genres come straight from the music providers">
-        <div className="no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8" role="tablist" aria-label="Genres">
+        <div className="no-scrollbar swipe-fade -mx-4 mb-3 flex gap-2 overflow-x-auto px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8" role="tablist" aria-label="Genres">
           <button type="button" role="tab" aria-selected={genre === ''} onClick={() => setGenre('')} className={`chip ${genre === '' ? 'chip-active' : ''}`}>
             All genres
           </button>

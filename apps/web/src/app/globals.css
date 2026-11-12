@@ -113,6 +113,14 @@
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
   }
+  /* Swipe rows on phones: the right edge fades out, so the half-visible next card reads as
+     "swipe for more" instead of content that is cut off. The page itself never scrolls sideways. */
+  @media (max-width: 767px) {
+    .swipe-fade {
+      -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+      mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+    }
+  }
   .text-balance {
     text-wrap: balance;
   }

@@ -41,7 +41,7 @@ export function Segmented<T extends string>({ items, value, onChange, label }: {
           role="tab"
           aria-selected={value === t.id}
           onClick={() => onChange(t.id)}
-          className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold transition duration-200 ${value === t.id ? 'bg-white text-ink' : 'text-white/70 hover:bg-white/[0.06] hover:text-white'}`}
+          className={`shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold transition duration-200 sm:px-4 sm:text-sm ${value === t.id ? 'bg-white text-ink' : 'text-white/70 hover:bg-white/[0.06] hover:text-white'}`}
         >
           {t.label}
         </button>
@@ -72,7 +72,7 @@ export function Section({ title, subtitle, href, children }: { title: string; su
 /** Horizontal scroller for cards. */
 export function Row({ children }: { children: ReactNode }) {
   // scroll-padding keeps the first card aligned with the section heading (snap would otherwise eat the left padding)
-  return <div className="stagger no-scrollbar -mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-3 pt-1 md:-mx-6 md:scroll-px-6 md:gap-4 md:px-6 lg:-mx-8 lg:scroll-px-8 lg:px-8">{children}</div>;
+  return <div className="stagger no-scrollbar swipe-fade -mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-3 pt-1 md:-mx-6 md:scroll-px-6 md:gap-4 md:px-6 lg:-mx-8 lg:scroll-px-8 lg:px-8">{children}</div>;
 }
 
 export function Grid({ children }: { children: ReactNode }) {

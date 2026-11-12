@@ -141,7 +141,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
     return (
       <Centered>
         <h1 className="text-xl font-bold text-white">The backend is not configured</h1>
-        <p className="mt-2 text-sm text-white/75">The admin console needs the SAHU MUSIC API and its Neon database. Deploy the project on Vercel with the Neon integration connected (see README).</p>
+        <p className="mt-2 text-sm text-white/75">
+          This copy of the site has no backend (for example a local static server), so you cannot sign in here. The admin console needs the SAHU MUSIC API and its Neon database.
+        </p>
+        <a href="https://sahu-music.vercel.app/admin/" className="btn-gold mt-5 w-full">Open the live admin console</a>
+        <p className="mt-3 text-xs text-muted">
+          To run it locally with the database: <code className="text-gold">vercel env pull .env.neon</code>, <code className="text-gold">npm run build:site</code>, then <code className="text-gold">npm run serve -- --env-file .env.neon</code>.
+        </p>
       </Centered>
     );
   }
