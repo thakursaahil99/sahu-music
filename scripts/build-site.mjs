@@ -33,7 +33,9 @@ console.log(`Service worker version: ${/const VERSION = '([^']*)'/.exec(stamped)
 // The Android app asks for /app-version.json at start-up and offers the download when the build
 // number here is higher than its own. It comes from apps/mobile/pubspec.yaml ("version: 1.1.0+2"),
 // so bumping that version and publishing the new APK is all a release needs.
-const pubspec = readFileSync(join(root, 'apps', 'mobile', 'pubspec.yaml'), 'utf8');
+const pubspecFile = join(root, 'apps', 'mobile', 'pubspec.yaml');
+if (!existsSync(pubspecFile)) console.warn('apps/mobile/pubspec.yaml not found: app-version.json falls back to 1.0.0 (build 1).');
+const pubspec = existsSync(pubspecFile) ? readFileSync(pubspecFile, 'utf8') : '';
 const [, appVersion = '1.0.0', appBuild = '1'] = /^version:\s*([\d.]+)\+(\d+)/m.exec(pubspec) ?? [];
 const siteUrl =
   (process.env.NEXT_PUBLIC_SITE_URL || '').trim().replace(/^﻿/, '').replace(/\/$/, '') ||
