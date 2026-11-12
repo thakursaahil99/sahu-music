@@ -64,6 +64,7 @@ export async function createSession(userId: string, client: 'web' | 'mobile' | '
   const token = randomBytes(32).toString('base64url');
   const expires = new Date(Date.now() + SESSION_DAYS * 864e5);
   await query('insert into sessions (token_hash, user_id, client, expires_at) values ($1, $2, $3, $4)', [sha256(token), userId, client, expires.toISOString()]);
+  await query('update profiles set last_seen_at = now() where id = $1', [userId]).catch(() => undefined);
   return { token, cookie: sessionCookie(token, SESSION_DAYS * 86400), expiresAt: expires.toISOString() };
 }
 
@@ -83,16 +84,20 @@ export async function currentAccount(req: Request): Promise<Account | null> {
   const t = tokenFrom(req);
   if (!t || t.token.length < 20 || t.token.length > 100) return null;
   if (t.viaCookie && req.method !== 'GET' && req.method !== 'HEAD') assertSameOrigin(req);
-  const row = await one<{ id: string; email: string; display_name: string | null; avatar_url: string | null; role: 'user' | 'admin'; is_blocked: boolean; expires_at: string }>(
-    `select u.id, u.email::text as email, p.display_name, p.avatar_url, p.role, p.is_blocked, s.expires_at
+  const row = await one<{ id: string; email: string; display_name: string | null; avatar_url: string | null; role: 'user' | 'admin'; is_blocked: boolean; expires_at: string; last_seen_at: string | null }>(
+    `select u.id, u.email::text as email, p.display_name, p.avatar_url, p.role, p.is_blocked, s.expires_at, p.last_seen_at
        from sessions s join users u on u.id = s.user_id join profiles p on p.id = u.id
       where s.token_hash = $1 and s.expires_at > now()`,
     [sha256(t.token)],
   );
   if (!row) return null;
+  // "last active" for the admin console, written at most every 5 minutes per account
+  if (!row.last_seen_at || Date.now() - new Date(row.last_seen_at).getTime() > 5 * 60_000) {
+    await query('update profiles set last_seen_at = now() where id = $1', [row.id]).catch(() => undefined);
+  }
   // sliding expiry: renew once less than half the lifetime is left
   if (new Date(row.expires_at).getTime() - Date.now() < (SESSION_DAYS / 2) * 864e5) {
-    void query('update sessions set expires_at = $2 where token_hash = $1', [sha256(t.token), new Date(Date.now() + SESSION_DAYS * 864e5).toISOString()]).catch(() => undefined);
+    await query('update sessions set expires_at = $2 where token_hash = $1', [sha256(t.token), new Date(Date.now() + SESSION_DAYS * 864e5).toISOString()]).catch(() => undefined);
   }
   return { id: row.id, email: row.email, displayName: row.display_name, avatarUrl: row.avatar_url, role: row.role, isBlocked: row.is_blocked };
 }

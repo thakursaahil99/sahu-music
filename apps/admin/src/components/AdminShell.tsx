@@ -17,6 +17,7 @@ interface Me {
 
 const NAV = [
   ['/', 'Dashboard'],
+  ['/users', 'Users'],
   ['/rights', 'Rights verification'],
   ['/sync', 'Catalogue sync'],
   ['/songs', 'Songs'],
@@ -26,7 +27,6 @@ const NAV = [
   ['/playlists', 'Playlists'],
   ['/providers', 'Music providers'],
   ['/errors', 'API errors'],
-  ['/users', 'Users'],
 ] as const;
 
 interface AdminCtx {

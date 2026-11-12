@@ -1,11 +1,14 @@
 // Runs the built website + admin panel and the /api backend together, like Vercel does.
 //
-//   npm run build:all && npm run serve -- --env-file path/to/.env     (needs DATABASE_URL)
+//   npm run build:site && npm run serve        (database address fetched from the linked Vercel project)
+//   npm run serve -- --env-file path/to/.env    (or give it yourself)
 //   PORT=4000 npm run serve
 //
 // Static files come from apps/web/out (the admin panel is inside it at /admin). /api/v1/* goes to
 // api/server.ts, bundled on the fly with esbuild.
-import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { createReadStream, existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { createServer } from 'node:http';
 import { dirname, extname, join, normalize } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -14,11 +17,26 @@ import { build } from 'esbuild';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = join(root, 'apps', 'web', 'out');
 
-const envFileArg = process.argv.indexOf('--env-file');
-if (envFileArg > 0) {
-  for (const line of readFileSync(process.argv[envFileArg + 1], 'utf8').split(/\r?\n/)) {
+const loadEnv = (file) => {
+  for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
     const m = /^([A-Z0-9_]+)=(.*)$/.exec(line);
     if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^"(.*)"$/, '$1');
+  }
+};
+const envFileArg = process.argv.indexOf('--env-file');
+if (envFileArg > 0) loadEnv(process.argv[envFileArg + 1]);
+// No database address given: take it from the linked Vercel project (same database as the live
+// site, so the same accounts and admin log-in work locally). Kept in memory only.
+if (!process.env.DATABASE_URL) {
+  const dir = mkdtempSync(join(tmpdir(), 'sahu-env-'));
+  try {
+    console.log('Fetching the database address from Vercel…');
+    execFileSync('vercel', ['env', 'pull', join(dir, '.env'), '--environment=production', '--yes'], { cwd: root, stdio: 'ignore', shell: process.platform === 'win32' });
+    loadEnv(join(dir, '.env'));
+  } catch {
+    console.warn('Could not reach Vercel ("vercel link" first). Accounts and the admin console stay off.');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 }
 

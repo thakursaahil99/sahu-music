@@ -4,11 +4,15 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { PageTitle } from '@/components/AdminShell';
 import { api, audiusAppName } from '@/lib/backend';
+import { ago } from '@/lib/format';
 
 interface Stats {
   users: number; admins: number; blocked_users: number; songs: number; public_songs: number; artists: number; albums: number;
   playlists: number; favorites: number; plays_24h: number; plays_7d: number; rights_pending: number; rights_approved: number;
   rights_blocked: number; api_errors_24h: number;
+  new_users_24h: number; new_users_7d: number; active_users_24h: number; active_users_7d: number; signed_in_devices: number;
+  signups_by_day: { day: string; users: number }[];
+  recent_users: { id: string; email: string; display_name: string | null; created_at: string; last_seen_at: string | null }[];
   plays_by_day: { day: string; plays: number }[];
   top_tracks: { title: string; artist: string; plays: number }[];
 }
@@ -49,8 +53,39 @@ export default function DashboardPage() {
       {!stats && !error && <p className="text-sm text-muted">Loading…</p>}
       {stats && (
         <>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-gold">Users</h2>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
             <Stat label="Registered users" value={stats.users} href="/users" />
+            <Stat label="New · last 24 h" value={stats.new_users_24h} href="/users?filter=new7d" />
+            <Stat label="New · last 7 days" value={stats.new_users_7d} href="/users?filter=new7d" />
+            <Stat label="Active · last 24 h" value={stats.active_users_24h} href="/users?filter=active7d" />
+            <Stat label="Active · last 7 days" value={stats.active_users_7d} href="/users?filter=active7d" />
+            <Stat label="Signed-in devices" value={stats.signed_in_devices} />
+          </div>
+
+          <section className="card mt-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-gold">Newest users</h2>
+              <Link href="/users" className="text-sm font-semibold text-gold hover:text-gold-soft">All users →</Link>
+            </div>
+            {stats.recent_users.length === 0 ? (
+              <p className="text-sm text-muted">Nobody has signed up yet.</p>
+            ) : (
+              <ul className="divide-y divide-coal-line text-sm">
+                {stats.recent_users.map((u) => (
+                  <li key={u.id}>
+                    <Link href={`/users/view?id=${u.id}`} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 py-2 hover:text-gold">
+                      <span className="min-w-0 truncate text-white">{u.display_name || 'No name'} <span className="text-muted">· {u.email}</span></span>
+                      <span className="text-xs text-muted">joined {ago(u.created_at)} · active {ago(u.last_seen_at)}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <h2 className="mb-3 mt-8 text-sm font-bold uppercase tracking-widest text-gold">Listening and catalogue</h2>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <Stat label="Plays · last 24 h (signed-in users)" value={stats.plays_24h} />
             <Stat label="Plays · last 7 days (signed-in users)" value={stats.plays_7d} />
             <Stat label="Favourites saved" value={stats.favorites} />

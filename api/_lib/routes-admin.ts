@@ -185,6 +185,17 @@ export async function adminStats(req: Request): Promise<Response> {
     'users',           (select count(*) from profiles),
     'admins',          (select count(*) from profiles where role = 'admin'),
     'blocked_users',   (select count(*) from profiles where is_blocked),
+    'new_users_24h',   (select count(*) from profiles where created_at > now() - interval '24 hours'),
+    'new_users_7d',    (select count(*) from profiles where created_at > now() - interval '7 days'),
+    'active_users_24h',(select count(*) from profiles where last_seen_at > now() - interval '24 hours'),
+    'active_users_7d', (select count(*) from profiles where last_seen_at > now() - interval '7 days'),
+    'signed_in_devices',(select count(*) from sessions where expires_at > now()),
+    'signups_by_day',  (select coalesce(jsonb_agg(jsonb_build_object('day', d, 'users', c) order by d), '[]'::jsonb)
+                          from (select date_trunc('day', created_at)::date as d, count(*) as c
+                                  from profiles where created_at > now() - interval '14 days' group by 1) x),
+    'recent_users',    (select coalesce(jsonb_agg(r order by r.created_at desc), '[]'::jsonb)
+                          from (select p.id, u.email::text as email, p.display_name, p.created_at, p.last_seen_at
+                                  from profiles p join users u on u.id = p.id order by p.created_at desc limit 8) r),
     'songs',           (select count(*) from songs),
     'public_songs',    (select count(*) from songs where is_public),
     'artists',         (select count(*) from artists),

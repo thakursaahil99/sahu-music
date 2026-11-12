@@ -25,7 +25,7 @@ export default function PrivacyPage() {
         <li>your display name;</li>
         <li>your favourites, playlists, listening history and preferences.</li>
       </ul>
-      <p>Every request for your library is checked against your signed-in session, so only you can read or change your personal data. You can delete your account and all of this data from your Profile at any time. Sign-in uses a secure, HttpOnly cookie that only keeps you logged in; we use no tracking cookies.</p>
+      <p>Every request for your library is checked against your signed-in session, so other users can never read or change your personal data. To run the service and help you with your account, SAHU MUSIC administrators can see your account details (name, email, sign-up date, when you were last active), your library and your listening history, and can block or delete an account that breaks the rules. Nobody, administrators included, can see your password. You can delete your account and all of this data from your Profile at any time. Sign-in uses a secure, HttpOnly cookie that only keeps you logged in; we use no tracking cookies.</p>
 
       <h2>3. Music providers</h2>
       <p>

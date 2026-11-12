@@ -2,6 +2,7 @@ import { HttpError } from './db';
 import { fail, json } from './http';
 import * as account from './routes-account';
 import * as admin from './routes-admin';
+import * as adminUsers from './routes-admin-users';
 import * as library from './routes-library';
 import * as pub from './routes-public';
 
@@ -40,6 +41,9 @@ const ROUTES: Record<string, Handler> = {
   'POST admin/rights': admin.adminRights,
   'POST admin/import': admin.adminImport,
   'POST admin/prune-errors': admin.adminPruneErrors,
+  'POST admin/users': adminUsers.adminUsers,
+  'POST admin/user': adminUsers.adminUser,
+  'POST admin/user-action': adminUsers.adminUserAction,
 };
 
 /** The API path, from the rewrite's ?route= or from the URL itself (/api/v1/<path>/). */
