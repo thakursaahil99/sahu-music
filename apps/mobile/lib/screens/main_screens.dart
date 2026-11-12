@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config.dart';
 import '../models.dart';
+import '../services/updates.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -580,10 +581,19 @@ class SettingsScreen extends ConsumerWidget {
           },
         ),
         header('About'),
-        const ListTile(
-          leading: LogoMark(size: 40),
-          title: Text('${Brand.name} 1.0.0'),
-          subtitle: Text(Brand.tagline, style: TextStyle(color: Brand.gold)),
+        FutureBuilder(
+          future: Updates.info(),
+          builder: (_, snap) => ListTile(
+            leading: const LogoMark(size: 40),
+            title: Text('${Brand.name} ${snap.data?.version ?? ''}'),
+            subtitle: const Text(Brand.tagline, style: TextStyle(color: Brand.gold)),
+          ),
+        ),
+        ListTile(
+          leading: const Icon(Icons.system_update_rounded),
+          title: const Text('Check for updates'),
+          subtitle: const Text('Get the newest version of the app', style: TextStyle(color: Brand.muted)),
+          onTap: Updates.checkNow,
         ),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16),

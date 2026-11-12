@@ -13,7 +13,7 @@ import { Icon } from './icons';
  * the mini player. The same element moves between the two places, so the video never reloads.
  */
 export function VideoStage() {
-  const { current, fullOpen, videoSlot, setFullOpen } = usePlayer();
+  const { current, fullOpen, videoSlot, setFullOpen, stop } = usePlayer();
   const video = !!current?.video;
   const [rect, setRect] = useState<DOMRect | null>(null);
 
@@ -62,8 +62,11 @@ export function VideoStage() {
         <div className="flex items-center gap-2 bg-black/90 px-3 py-1.5 text-xs text-white/80">
           <span className="rounded bg-[#ff0033] px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">YouTube</span>
           <span className="min-w-0 flex-1 truncate">{current?.title}</span>
-          <button type="button" onClick={() => setFullOpen(true)} className="icon-btn !h-7 !w-7 text-white/80 hover:text-gold" aria-label="Open full player">
+          <button type="button" onClick={() => setFullOpen(true)} className="icon-btn !h-8 !w-8 text-white/80 hover:text-gold" aria-label="Open full player">
             <Icon name="chevronDown" size={16} className="rotate-180" />
+          </button>
+          <button type="button" onClick={stop} className="icon-btn !h-8 !w-8 text-white/80 hover:text-white" aria-label="Close video">
+            <Icon name="close" size={16} />
           </button>
         </div>
       )}

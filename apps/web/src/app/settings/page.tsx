@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { clearApiCache } from '@sahu/api';
 import { Icon } from '@/components/icons';
 import { usePwaInstall } from '@/components/Pwa';
@@ -27,6 +28,35 @@ export default function SettingsPage() {
       await Promise.all(keys.filter((k) => k.startsWith('sahu-') && !k.includes('shell')).map((k) => caches.delete(k)));
     }
     toast('Cached artwork and metadata cleared');
+  };
+
+  /**
+   * Gets the newest deployed version now (useful in the installed app, where the browser only
+   * looks for updates now and then). A waiting new version is activated and the page reloads.
+   */
+  const [checking, setChecking] = useState(false);
+  const checkForUpdate = async () => {
+    setChecking(true);
+    try {
+      const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : undefined;
+      if (!reg) {
+        window.location.reload();
+        return;
+      }
+      await reg.update();
+      // a new version may still be installing: give it a moment to finish
+      for (let i = 0; i < 20 && reg.installing; i++) await new Promise((r) => setTimeout(r, 250));
+      if (reg.waiting) {
+        toast('Updating to the newest version…');
+        navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload(), { once: true });
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        return;
+      }
+      toast('You have the newest version.');
+    } catch {
+      toast('Could not check for updates. Check your connection.', 'error');
+    }
+    setChecking(false);
   };
 
   return (
@@ -65,6 +95,9 @@ export default function SettingsPage() {
           </p>
         )}
         <div className="mt-4 flex flex-wrap gap-3">
+          <button type="button" className="btn-gold" onClick={() => void checkForUpdate()} disabled={checking}>
+            <Icon name="download" size={16} /> {checking ? 'Checking…' : 'Check for updates'}
+          </button>
           <button type="button" className="btn-outline" onClick={() => void clearCache()}>Clear cached data</button>
           <button type="button" className="btn-outline" onClick={() => { clearHistory(); toast('Listening history cleared'); }}>Clear listening history</button>
         </div>

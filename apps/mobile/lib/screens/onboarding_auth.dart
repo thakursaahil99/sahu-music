@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config.dart';
+import '../services/updates.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -14,13 +15,27 @@ class RootGate extends ConsumerStatefulWidget {
   ConsumerState<RootGate> createState() => _RootGateState();
 }
 
-class _RootGateState extends ConsumerState<RootGate> {
+class _RootGateState extends ConsumerState<RootGate> with WidgetsBindingObserver {
   bool _splashDone = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future<void>.delayed(const Duration(milliseconds: 1400), () => mounted ? setState(() => _splashDone = true) : null);
+    // a newer app version on the website? (checked again when the app comes back to the foreground)
+    Future<void>.delayed(const Duration(seconds: 4), Updates.checkInBackground);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) Updates.checkInBackground();
   }
 
   @override

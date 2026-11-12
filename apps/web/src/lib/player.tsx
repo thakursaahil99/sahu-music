@@ -40,6 +40,8 @@ interface PlayerValue {
   jumpTo(i: number): void;
   removeFromQueue(i: number): void;
   clearQueue(): void;
+  /** Stop playback and close the player (and a YouTube video) completely. */
+  stop(): void;
   /**
    * Prepare a song the listener will probably play: `intent` (pointer resting on it, finger down)
    * buffers it; `likely` (top search result, the #1 hit) only opens it, which costs ~100 KB.
@@ -413,6 +415,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const stop = useCallback(() => {
+    activeRef.current?.stop();
+    activeRef.current = null;
+    setQueue([]);
+    setIndex(-1);
+    setIsPlaying(false);
+    setFullOpen(false);
+  }, []);
+
   // Media Session → lock-screen / notification / hardware media-key controls.
   useEffect(() => {
     if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
@@ -466,10 +477,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const value = useMemo<PlayerValue>(
     () => ({
       queue, index, current, isPlaying, isLoading, shuffle, repeat, volume, error, fullOpen, setFullOpen, videoSlot, setVideoSlot,
-      playQueue, toggle, next, prev, seek, toggleShuffle, cycleRepeat, setVolume, addToQueue, playNext, jumpTo, removeFromQueue, clearQueue, warm,
+      playQueue, toggle, next, prev, seek, toggleShuffle, cycleRepeat, setVolume, addToQueue, playNext, jumpTo, removeFromQueue, clearQueue, stop, warm,
     }),
     [queue, index, current, isPlaying, isLoading, shuffle, repeat, volume, error, fullOpen, videoSlot,
-      playQueue, toggle, next, prev, seek, toggleShuffle, cycleRepeat, setVolume, addToQueue, playNext, jumpTo, removeFromQueue, clearQueue, warm],
+      playQueue, toggle, next, prev, seek, toggleShuffle, cycleRepeat, setVolume, addToQueue, playNext, jumpTo, removeFromQueue, clearQueue, stop, warm],
   );
 
   return (
