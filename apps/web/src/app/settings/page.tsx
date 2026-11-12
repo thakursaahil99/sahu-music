@@ -74,8 +74,9 @@ export default function SettingsPage() {
         <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-gold">Music sources</h2>
         <ul className="space-y-3">
           {providers.map((p) => (
-            <li key={p.id} className="flex items-start justify-between gap-4 text-sm">
-              <span>
+            <li key={p.id} className="flex items-start justify-between gap-3 text-sm">
+              {/* min-w-0 + anywhere: a long setting name (NEXT_PUBLIC_…) wraps instead of pushing the badge off a narrow phone */}
+              <span className="min-w-0 [overflow-wrap:anywhere]">
                 <span className="font-semibold text-white">{p.name}</span>
                 {p.configHint && <span className="block text-xs text-muted">{p.configHint}</span>}
               </span>

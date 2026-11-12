@@ -174,7 +174,8 @@ export function QuickTile({ track, list, index }: { track: Track; list: Track[];
       {...intent}
       onClick={() => (active ? toggle() : playQueue(list, index))}
       aria-label={active && isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
-      className={`surface surface-hover group flex items-center gap-3 overflow-hidden rounded-2xl p-1.5 pr-3 text-left ${active ? '!bg-white/[0.08] !ring-dyn/50' : ''} ${unavailable ? 'opacity-50' : ''}`}
+      // w-full min-w-0: a <button> is as wide as its text by default; a long title would push the whole page sideways on a phone
+      className={`surface surface-hover group flex w-full min-w-0 items-center gap-3 overflow-hidden rounded-2xl p-1.5 pr-3 text-left ${active ? '!bg-white/[0.08] !ring-dyn/50' : ''} ${unavailable ? 'opacity-50' : ''}`}
     >
       <Artwork mirrors={track.artworkMirrors} src={track.artwork} alt="" size="sm" rounded="rounded-xl" className="h-12 w-12 shrink-0 md:h-14 md:w-14" />
       <span className="min-w-0 flex-1">

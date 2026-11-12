@@ -30,6 +30,8 @@ export function QuickSearch() {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [results, setResults] = useState<Track[]>([]);
+  /** The query `results` belong to (they stay on screen while the next query runs). */
+  const [resultsFor, setResultsFor] = useState('');
   const [searching, setSearching] = useState(false);
   const [failed, setFailed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -44,20 +46,33 @@ export function QuickSearch() {
   );
 
   useEffect(() => {
-    setResults([]);
     setFailed(false);
     setActive(-1);
     if (query.length < 2) {
+      setResults([]);
       setSearching(false);
       return;
     }
+    // the previous songs stay in the list until the new ones arrive (no flicker while typing)
     let alive = true;
     const ctrl = new AbortController();
     setSearching(true);
     music
-      .searchTracks(query, PAGE, { userSearch: true, signal: ctrl.signal, onPartial: (partial) => alive && setResults(partial) })
+      .searchTracks(query, PAGE, {
+        userSearch: true,
+        signal: ctrl.signal,
+        onPartial: (partial) => {
+          if (!alive) return;
+          setResults(partial);
+          setResultsFor(query);
+        },
+      })
       .then(
-        (all) => alive && setResults(all),
+        (all) => {
+          if (!alive) return;
+          setResults(all);
+          setResultsFor(query);
+        },
         () => alive && setFailed(true),
       )
       .finally(() => alive && setSearching(false));
@@ -78,8 +93,13 @@ export function QuickSearch() {
     return () => document.removeEventListener('pointerdown', onDown);
   }, [open]);
 
-  const songs = (results.length ? results : quick).slice(0, SHOWN);
-  const queue = results.length ? results : quick;
+  // This query's results; else instant matches for it; else, while the listener is still typing
+  // the same words ("arij" → "arijit"), the previous songs, dimmed — never songs of an unrelated query.
+  const fresh = resultsFor === query && results.length > 0;
+  const related = !!resultsFor && (query.startsWith(resultsFor) || resultsFor.startsWith(query));
+  const queue = fresh ? results : quick.length ? quick : related ? results : [];
+  const stale = !fresh && !quick.length && queue.length > 0;
+  const songs = queue.slice(0, SHOWN);
   const typed = sanitizeQuery(text);
   const showList = open && typed.length >= 2;
   // options: the songs, then "See all results"
@@ -154,7 +174,7 @@ export function QuickSearch() {
 
       {showList && (
         <div className="absolute inset-x-0 top-full z-50 mt-2 overflow-hidden rounded-2xl bg-coal/95 p-1.5 shadow-lift ring-1 ring-white/10 backdrop-blur-xl animate-pop-in">
-          <ul id={listId} role="listbox" aria-label={`Songs for ${typed}`}>
+          <ul id={listId} role="listbox" aria-label={`Songs for ${typed}`} aria-busy={searching || query !== typed} data-results-for={fresh ? query : ''}>
             {songs.map((t, i) => {
               const playing = !!current && trackKey(current) === trackKey(t) && isPlaying;
               return (
@@ -169,7 +189,7 @@ export function QuickSearch() {
                   }}
                   onMouseDown={(e) => e.preventDefault()} // keep the focus in the box
                   onClick={() => play(i)}
-                  className={`flex cursor-pointer items-center gap-3 rounded-xl p-1.5 pr-3 ${active === i ? 'bg-white/[0.08]' : ''}`}
+                  className={`flex cursor-pointer items-center gap-3 rounded-xl p-1.5 pr-3 transition-opacity ${active === i ? 'bg-white/[0.08]' : ''} ${stale ? 'opacity-50' : ''}`}
                 >
                   <Artwork mirrors={t.artworkMirrors} src={t.artwork} alt="" size="sm" rounded="rounded-lg" className="h-10 w-10 shrink-0" />
                   <span className="min-w-0 flex-1">
@@ -182,7 +202,8 @@ export function QuickSearch() {
             })}
             {songs.length === 0 && (
               <li className="px-3 py-3 text-sm text-white/55" aria-live="polite">
-                {searching ? 'Searching every source…' : failed ? 'Search failed. Check your connection.' : `No songs found for “${typed}”`}
+                {/* while the typing pause has not passed yet, it is still "searching", not "nothing found" */}
+                {searching || query !== typed ? 'Searching every source…' : failed ? 'Search failed. Check your connection.' : `No songs found for “${typed}”`}
               </li>
             )}
             <li
