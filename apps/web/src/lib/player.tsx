@@ -286,8 +286,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const warm = useCallback(
     (t: Track, how: 'intent' | 'likely' = 'intent') => {
-      if (t.video || t.live || !mayPreload() || !music.isTrackPlayable(t)) return;
-      audioRef.current?.preload(t, how);
+      if (t.live || !mayPreload() || !music.isTrackPlayable(t)) return;
+      // YouTube: get its player ready (no video is loaded or played until the tap)
+      if (t.video) ytRef.current?.prepare();
+      else audioRef.current?.preload(t, how);
     },
     [mayPreload],
   );

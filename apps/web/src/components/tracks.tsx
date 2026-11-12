@@ -78,6 +78,13 @@ export function useWarm(track: Track | null | undefined) {
   const { warm } = usePlayer();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
+  // A YouTube song on screen: start YouTube's player shortly after, so the first tap does not
+  // wait for the player to load (phones have no hover, so pointer intent comes too late).
+  useEffect(() => {
+    if (!track?.video) return;
+    const t = setTimeout(() => warm(track, 'likely'), 1200);
+    return () => clearTimeout(t);
+  }, [track, warm]);
   const go = () => track && warm(track);
   return {
     onPointerEnter: (e: React.PointerEvent) => {

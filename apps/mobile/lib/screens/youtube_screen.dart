@@ -69,10 +69,14 @@ class _YoutubeScreenState extends ConsumerState<YoutubeScreen> with WidgetsBindi
     ref.read(libraryProvider.notifier).addHistory(_current);
   }
 
-  /// YouTube does not allow background playback: pause when the app is not on screen.
+  /// YouTube does not allow background playback: pause when the app is no longer on screen.
+  /// `inactive` keeps playing: the app is still visible then (split screen with another app in
+  /// focus, the notification shade pulled down), so the video stays on screen as YouTube requires.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) _ctrl.pauseVideo();
+    if (state == AppLifecycleState.hidden || state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      _ctrl.pauseVideo();
+    }
   }
 
   @override

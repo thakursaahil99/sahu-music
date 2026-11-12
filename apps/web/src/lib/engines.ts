@@ -242,10 +242,29 @@ export class YouTubeEngine implements Engine {
   private volume = 100;
   private failed = false;
 
+  private creating: Promise<void> | null = null;
+
   constructor(private readonly on: EngineEvents) {}
 
-  private async ensure(): Promise<void> {
-    if (this.player) return;
+  /**
+   * Start YouTube's player now, without loading any video, so that the first YouTube song does
+   * not wait ~3 s for the player to load. Called when a YouTube song appears on screen.
+   */
+  prepare(): void {
+    this.ensure().catch(() => undefined);
+  }
+
+  /** Creates the player once, even when several callers ask at the same time. */
+  private ensure(): Promise<void> {
+    if (this.player) return Promise.resolve();
+    this.creating ??= this.create().catch((e: Error) => {
+      this.creating = null;
+      throw e;
+    });
+    return this.creating;
+  }
+
+  private async create(): Promise<void> {
     const YT = await loadApi();
     const host = document.getElementById(YT_HOST_ID);
     if (!host) throw new Error('Video area missing.');
